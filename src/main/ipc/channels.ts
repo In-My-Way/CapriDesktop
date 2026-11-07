@@ -82,6 +82,7 @@ export const IPC_CHANNELS = {
   // adds editable system prompt (Capri // Brain settings)
   AGENT_GET_SYSTEM_PROMPT: 'agent:getSystemPrompt',
   AGENT_SET_SYSTEM_PROMPT: 'agent:setSystemPrompt',
+  AGENT_RESET_SYSTEM_PROMPT: 'agent:resetSystemPrompt',
   LLM_GET_SETTINGS: 'llm:getSettings',
   LLM_SET_SETTINGS: 'llm:setSettings',
   LLM_LIST_MODELS: 'llm:listModels',

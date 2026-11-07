@@ -209,7 +209,7 @@ export const de: Messages = {
   llm_scan: 'Suchen',
   llm_localModel: 'Aktives Modell',
 
-  vs_fishHelp: 'Füge die ID einer Stimme aus der fish.audio-Bibliothek oder deiner eigenen ein. Leer = Standardstimme von Fish Audio.',
+  vs_fishHelp: 'Füge die ID einer Stimme aus der fish.audio-Bibliothek oder deiner eigenen ein. Leer = Capris Standardstimme.',
   vs_emotionHelp: 'Fish Audio ändert den Ton mit Tags in eckigen Klammern, denselben wie in Capris Sätzen:',
   vs_testPhrase: 'Hi! Ich bin Capri, deine Begleiterin aus dem Cyberspace. Woran denkst du gerade?',
   vs_title: 'Capri // Stimme',
@@ -343,7 +343,9 @@ export const de: Messages = {
   sp_hint: 'Das ist, wer Capri ist. Schreib {name} dort, wo der Name stehen soll, mit dem sie dich anspricht. Ihre Regeln für Werkzeuge, Stimme und Blicke werden immer nach diesem Text angehängt, und die Änderung gilt ab deiner nächsten Nachricht.',
   sp_custom: 'Eigener',
   sp_default: 'Standard',
-  sp_reset: 'Standard wiederherstellen',
+  sp_reset: 'Standardprompt neu erzeugen',
+  sp_resetConfirm: 'Zum Ersetzen erneut klicken',
+  sp_resetDone: 'Standardprompt wiederhergestellt',
   sp_chars: '{n} Zeichen',
   sp_saveError: 'Die Änderungen konnten nicht gespeichert werden. Prüfe, ob der Ordner beschreibbar ist, und versuch es erneut.'
 }

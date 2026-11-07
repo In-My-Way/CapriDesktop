@@ -209,7 +209,7 @@ export const ja: Messages = {
   llm_scan: '検索',
   llm_localModel: '使用中のモデル',
 
-  vs_fishHelp: 'fish.audioライブラリの音声または自分の音声のIDを貼り付けてください。空欄 = Fish Audioの既定の音声。',
+  vs_fishHelp: 'fish.audioライブラリの音声または自分の音声のIDを貼り付けてください。空欄 = カプリの既定の音声。',
   vs_emotionHelp: 'Fish Audioは角かっこのタグで声のトーンを変えます。カプリのセリフと同じタグです:',
   vs_testPhrase: 'やあ！サイバースペースの相棒、カプリだよ。何を考えてるの？',
   vs_title: 'カプリ // 音声',
@@ -343,7 +343,9 @@ export const ja: Messages = {
   sp_hint: 'これがCapriという存在です。彼女があなたを呼ぶ名前を入れる場所には {name} と書いてください。ツール・声・視線のルールは常にこのテキストの後に追加され、変更は次のメッセージから反映されます。',
   sp_custom: 'カスタム',
   sp_default: 'デフォルト',
-  sp_reset: 'デフォルトに戻す',
+  sp_reset: 'デフォルトのプロンプトを再生成',
+  sp_resetConfirm: 'もう一度クリックすると置き換えます',
+  sp_resetDone: 'デフォルトのプロンプトに戻しました',
   sp_chars: '{n} 文字',
   sp_saveError: '変更を保存できませんでした。フォルダーに書き込めるか確認して、もう一度お試しください。'
 }

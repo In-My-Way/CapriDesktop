@@ -325,6 +325,7 @@ export function registerIpcHandlers(): void {
   // read, save and reset Capri's editable system prompt
   ipcMain.handle(IPC_CHANNELS.AGENT_GET_SYSTEM_PROMPT, () => getSystemPromptInfo())
   ipcMain.handle(IPC_CHANNELS.AGENT_SET_SYSTEM_PROMPT, (_event, text: string) => setSystemPrompt(text))
+  ipcMain.handle(IPC_CHANNELS.AGENT_RESET_SYSTEM_PROMPT, () => resetSystemPrompt())
   ipcMain.handle(IPC_CHANNELS.LLM_GET_SETTINGS, () => getLlmSettings())
   ipcMain.handle(IPC_CHANNELS.LLM_SET_SETTINGS, (_event, update: LlmSettingsUpdate) => setLlmSettings(update))
   ipcMain.handle(IPC_CHANNELS.LLM_LIST_MODELS, (_event, baseUrl: string, apiKey?: string) => listCloudModels(baseUrl, apiKey))

@@ -209,7 +209,7 @@ export const ko: Messages = {
   llm_scan: '검색',
   llm_localModel: '사용 중인 모델',
 
-  vs_fishHelp: 'fish.audio 라이브러리의 음성 또는 직접 만든 음성의 ID를 붙여넣으세요. 비워 두면 Fish Audio 기본 음성을 사용합니다.',
+  vs_fishHelp: 'fish.audio 라이브러리의 음성 또는 직접 만든 음성의 ID를 붙여넣으세요. 비워 두면 카프리의 기본 음성을 사용합니다.',
   vs_emotionHelp: 'Fish Audio는 대괄호 태그로 톤을 바꿉니다. 카프리의 대사에 쓰는 것과 같은 태그입니다:',
   vs_testPhrase: '안녕! 나는 사이버 공간의 동료 카프리야. 무슨 생각 해?',
   vs_title: '카프리 // 음성',
@@ -343,7 +343,9 @@ export const ko: Messages = {
   sp_hint: '이것이 Capri라는 존재입니다. 그녀가 당신을 부르는 이름이 들어갈 곳에 {name}을 쓰세요. 도구, 목소리, 시선 규칙은 항상 이 텍스트 뒤에 추가되며, 변경 사항은 다음 메시지부터 적용됩니다.',
   sp_custom: '사용자 지정',
   sp_default: '기본값',
-  sp_reset: '기본값으로 복원',
+  sp_reset: '기본 프롬프트 다시 만들기',
+  sp_resetConfirm: '한 번 더 클릭하면 바뀝니다',
+  sp_resetDone: '기본 프롬프트를 복원했습니다',
   sp_chars: '{n}자',
   sp_saveError: '변경 사항을 저장할 수 없습니다. 폴더에 쓸 수 있는지 확인하고 다시 시도하세요.'
 }

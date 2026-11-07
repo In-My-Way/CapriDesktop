@@ -209,7 +209,7 @@ export const fr: Messages = {
   llm_scan: 'Détecter',
   llm_localModel: 'Modèle actif',
 
-  vs_fishHelp: 'Collez l’ID d’une voix de la bibliothèque fish.audio ou de votre propre voix. Vide = voix par défaut de Fish Audio.',
+  vs_fishHelp: 'Collez l’ID d’une voix de la bibliothèque fish.audio ou de votre propre voix. Vide = voix par défaut de Capri.',
   vs_emotionHelp: 'Fish Audio module le ton avec des balises entre crochets, les mêmes que dans les répliques de Capri :',
   vs_testPhrase: 'Salut ! Je suis Capri, ta compagne du cyberespace. À quoi tu penses ?',
   vs_title: 'Capri // Voix',
@@ -343,7 +343,9 @@ export const fr: Messages = {
   sp_hint: 'C’est qui est Capri. Écris {name} là où doit aller le nom qu’elle te donne. Ses règles d’outils, de voix et de regards sont toujours ajoutées après ce texte, et le changement s’applique dès ton prochain message.',
   sp_custom: 'Personnalisé',
   sp_default: 'Par défaut',
-  sp_reset: 'Rétablir par défaut',
+  sp_reset: 'Régénérer le prompt par défaut',
+  sp_resetConfirm: 'Clique encore pour le remplacer',
+  sp_resetDone: 'Prompt par défaut rétabli',
   sp_chars: '{n} caractères',
   sp_saveError: 'Impossible d’enregistrer les modifications. Vérifie que le dossier est accessible en écriture et réessaie.'
 }

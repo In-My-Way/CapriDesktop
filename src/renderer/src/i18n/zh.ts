@@ -209,7 +209,7 @@ export const zh: Messages = {
   llm_scan: '检测',
   llm_localModel: '当前模型',
 
-  vs_fishHelp: '粘贴 fish.audio 音色库或你自己音色的 ID。留空 = 使用 Fish Audio 默认音色。',
+  vs_fishHelp: '粘贴 fish.audio 音色库或你自己音色的 ID。留空 = 使用 Capri 的默认音色。',
   vs_emotionHelp: 'Fish Audio 用方括号标签调整语气,与 Capri 台词中的标签相同:',
   vs_testPhrase: '你好!我是 Capri,你的赛博空间伙伴。你在想什么?',
   vs_title: 'Capri // 语音',
@@ -343,7 +343,9 @@ export const zh: Messages = {
   sp_hint: '这就是 Capri 的身份。在她称呼你的名字的位置写 {name}。她的工具、语音和眼神规则总会附加在这段文字之后,修改从你的下一条消息开始生效。',
   sp_custom: '自定义',
   sp_default: '默认',
-  sp_reset: '恢复默认',
+  sp_reset: '重新生成默认提示词',
+  sp_resetConfirm: '再点一次以替换',
+  sp_resetDone: '已恢复默认提示词',
   sp_chars: '{n} 个字符',
   sp_saveError: '无法保存更改。请检查文件夹是否可写入,然后重试。'
 }

@@ -248,6 +248,8 @@ const api = {
     setSystemPrompt: (text: string): Promise<SystemPromptPayload> =>
       ipcRenderer.invoke(IPC_CHANNELS.AGENT_SET_SYSTEM_PROMPT, text),
 
+    resetSystemPrompt: (): Promise<SystemPromptPayload> => ipcRenderer.invoke(IPC_CHANNELS.AGENT_RESET_SYSTEM_PROMPT),
+
     getLlmSettings: (): Promise<LlmPublicSettings> => ipcRenderer.invoke(IPC_CHANNELS.LLM_GET_SETTINGS),
 
     setLlmSettings: (update: LlmSettingsUpdate): Promise<{ success: boolean; error?: string; settings: LlmPublicSettings }> =>

@@ -111,6 +111,7 @@ export interface IElectronAPI {
     // Editable system prompt
     getSystemPrompt: () => Promise<SystemPromptPayload>
     setSystemPrompt: (text: string) => Promise<SystemPromptPayload>
+    resetSystemPrompt: () => Promise<SystemPromptPayload>
     getLlmSettings: () => Promise<LlmPublicSettings>
     setLlmSettings: (update: LlmSettingsUpdate) => Promise<{ success: boolean; error?: string; settings: LlmPublicSettings }>
     listLlmModels: (baseUrl: string, apiKey?: string) => Promise<{ ok: boolean; models: string[]; error?: string }>

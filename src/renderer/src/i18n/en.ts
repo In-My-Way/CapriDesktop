@@ -207,7 +207,7 @@ export const en = {
   llm_scan: 'Scan',
   llm_localModel: 'Active model',
 
-  vs_fishHelp: 'Paste the ID of a voice from the fish.audio library or your own. Empty = Fish Audio default voice.',
+  vs_fishHelp: 'Paste the ID of a voice from the fish.audio library or your own. Empty = Capri’s default voice.',
   vs_emotionHelp: "Fish Audio changes the tone with tags in brackets, the same ones Capri's lines use:",
   vs_testPhrase: "Hi! I'm Capri, your cyberspace companion. What's on your mind?",
   vs_title: 'Capri // Voice',
@@ -341,7 +341,9 @@ export const en = {
   sp_hint: 'This is who Capri is. Write {name} where her name for you should go. Her tool, voice and look rules are always added after this text, and the change applies from your next message.',
   sp_custom: 'Custom',
   sp_default: 'Default',
-  sp_reset: 'Restore default',
+  sp_reset: 'Regenerate default prompt',
+  sp_resetConfirm: 'Click again to replace it',
+  sp_resetDone: 'Default prompt restored',
   sp_chars: '{n} characters',
   sp_saveError: 'Could not save the changes. Check that the folder can be written to and try again.'
 }

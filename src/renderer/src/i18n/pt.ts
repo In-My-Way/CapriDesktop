@@ -209,7 +209,7 @@ export const pt: Messages = {
   llm_scan: 'Procurar',
   llm_localModel: 'Modelo ativo',
 
-  vs_fishHelp: 'Cole o ID de uma voz da biblioteca do fish.audio ou da sua própria voz. Vazio = voz padrão do Fish Audio.',
+  vs_fishHelp: 'Cole o ID de uma voz da biblioteca do fish.audio ou da sua própria voz. Vazio = voz padrão da Capri.',
   vs_emotionHelp: 'O Fish Audio muda o tom com etiquetas entre colchetes, as mesmas das falas da Capri:',
   vs_testPhrase: 'Oi! Eu sou a Capri, sua companheira do ciberespaço. No que você está pensando?',
   vs_title: 'Capri // Voz',
@@ -343,7 +343,9 @@ export const pt: Messages = {
   sp_hint: 'Isto é quem a Capri é. Escreva {name} onde deve ir o nome pelo qual ela te chama. As regras de ferramentas, voz e olhares dela são sempre adicionadas depois deste texto, e a mudança vale a partir da sua próxima mensagem.',
   sp_custom: 'Personalizado',
   sp_default: 'Padrão',
-  sp_reset: 'Restaurar padrão',
+  sp_reset: 'Regenerar prompt padrão',
+  sp_resetConfirm: 'Clique de novo para substituir',
+  sp_resetDone: 'Prompt padrão restaurado',
   sp_chars: '{n} caracteres',
   sp_saveError: 'Não foi possível salvar as alterações. Verifique se a pasta pode ser gravada e tente de novo.'
 }

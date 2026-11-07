@@ -23,6 +23,9 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
   const [defaultPrompt, setDefaultPrompt] = useState('')
   const [promptLoaded, setPromptLoaded] = useState(false)
   const [saveError, setSaveError] = useState(false)
+  // Regenerating asks for a second click, since it throws away a prompt of her own
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [resetDone, setResetDone] = useState(false)
 
   const scan = async () => {
     setIsScanning(true)
@@ -43,6 +46,8 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
     if (!isOpen) return
     setPromptLoaded(false)
     setSaveError(false)
+    setConfirmReset(false)
+    setResetDone(false)
     window.api.agent
       .getSystemPrompt()
       .then((info) => {
@@ -68,6 +73,35 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
     } catch (error) {
       // The window stays open so nothing written is lost
       console.error('[AgentSettings] Could not save:', error)
+      setSaveError(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!confirmReset) return
+    const timer = setTimeout(() => setConfirmReset(false), 4000)
+    return () => clearTimeout(timer)
+  }, [confirmReset])
+
+  useEffect(() => {
+    if (!resetDone) return
+    const timer = setTimeout(() => setResetDone(false), 3000)
+    return () => clearTimeout(timer)
+  }, [resetDone])
+
+  /** Puts the built-in prompt back and saves it right away */
+  const regenerateDefault = async () => {
+    if (!confirmReset) return setConfirmReset(true)
+    setConfirmReset(false)
+    try {
+      const info = await window.api.agent.resetSystemPrompt()
+      setPromptText(info.prompt)
+      setSavedPrompt(info.prompt)
+      setDefaultPrompt(info.defaultPrompt)
+      setSaveError(false)
+      setResetDone(true)
+    } catch (error) {
+      console.error('[AgentSettings] Could not restore the default prompt:', error)
       setSaveError(true)
     }
   }
@@ -132,11 +166,11 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
                 {t('sp_title')} <span className="text-[var(--cp-muted)]">({promptIsCustom ? t('sp_custom') : t('sp_default')})</span>
               </span>
               <button
-                onClick={() => setPromptText(defaultPrompt)}
-                disabled={!promptLoaded || !promptIsCustom}
+                onClick={() => void regenerateDefault()}
+                disabled={!promptLoaded || (!promptIsCustom && savedPrompt.trim() === defaultPrompt.trim())}
                 className="flex items-center gap-1 text-[13px] text-[var(--cp-red)] hover:text-[var(--cp-red-hi)] cursor-pointer disabled:opacity-40"
               >
-                <RotateCcw size={12} /> {t('sp_reset')}
+                <RotateCcw size={12} /> {confirmReset ? t('sp_resetConfirm') : resetDone ? t('sp_resetDone') : t('sp_reset')}
               </button>
             </div>
             <div className="cp-frame">
