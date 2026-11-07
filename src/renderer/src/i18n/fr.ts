@@ -338,11 +338,12 @@ export const fr: Messages = {
   vs_stSynthError: 'Échec de la synthèse : {error}',
   vs_stReset: 'Valeurs de Capri rétablies.',
 
-// System prompt editor (Capri // Brain settings)
-  sp_title: 'System prompt (personality)',
-  sp_hint: 'This is who Capri is. Write {name} where her name for you should go. Her tool, voice and look rules are always added after this text, and the change applies from your next message.',
-  sp_custom: 'Custom',
-  sp_default: 'Default',
-  sp_reset: 'Restore default',
-  sp_chars: '{n} characters'
+  // System prompt editor (Capri // Brain settings)
+  sp_title: 'Prompt système (personnalité)',
+  sp_hint: 'C’est qui est Capri. Écris {name} là où doit aller le nom qu’elle te donne. Ses règles d’outils, de voix et de regards sont toujours ajoutées après ce texte, et le changement s’applique dès ton prochain message.',
+  sp_custom: 'Personnalisé',
+  sp_default: 'Par défaut',
+  sp_reset: 'Rétablir par défaut',
+  sp_chars: '{n} caractères',
+  sp_saveError: 'Impossible d’enregistrer les modifications. Vérifie que le dossier est accessible en écriture et réessaie.'
 }

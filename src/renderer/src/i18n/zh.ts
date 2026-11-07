@@ -338,11 +338,12 @@ export const zh: Messages = {
   vs_stSynthError: '合成失败:{error}',
   vs_stReset: '已恢复 Capri 的默认值。',
 
-// System prompt editor (Capri // Brain settings)
-  sp_title: 'System prompt (personality)',
-  sp_hint: 'This is who Capri is. Write {name} where her name for you should go. Her tool, voice and look rules are always added after this text, and the change applies from your next message.',
-  sp_custom: 'Custom',
-  sp_default: 'Default',
-  sp_reset: 'Restore default',
-  sp_chars: '{n} characters'
+  // System prompt editor (Capri // Brain settings)
+  sp_title: '系统提示词(性格)',
+  sp_hint: '这就是 Capri 的身份。在她称呼你的名字的位置写 {name}。她的工具、语音和眼神规则总会附加在这段文字之后,修改从你的下一条消息开始生效。',
+  sp_custom: '自定义',
+  sp_default: '默认',
+  sp_reset: '恢复默认',
+  sp_chars: '{n} 个字符',
+  sp_saveError: '无法保存更改。请检查文件夹是否可写入,然后重试。'
 }

@@ -338,11 +338,12 @@ export const ko: Messages = {
   vs_stSynthError: '합성 실패: {error}',
   vs_stReset: '카프리 기본값으로 복원했습니다.',
 
-// System prompt editor (Capri // Brain settings)
-  sp_title: 'System prompt (personality)',
-  sp_hint: 'This is who Capri is. Write {name} where her name for you should go. Her tool, voice and look rules are always added after this text, and the change applies from your next message.',
-  sp_custom: 'Custom',
-  sp_default: 'Default',
-  sp_reset: 'Restore default',
-  sp_chars: '{n} characters'
+  // System prompt editor (Capri // Brain settings)
+  sp_title: '시스템 프롬프트 (성격)',
+  sp_hint: '이것이 Capri라는 존재입니다. 그녀가 당신을 부르는 이름이 들어갈 곳에 {name}을 쓰세요. 도구, 목소리, 시선 규칙은 항상 이 텍스트 뒤에 추가되며, 변경 사항은 다음 메시지부터 적용됩니다.',
+  sp_custom: '사용자 지정',
+  sp_default: '기본값',
+  sp_reset: '기본값으로 복원',
+  sp_chars: '{n}자',
+  sp_saveError: '변경 사항을 저장할 수 없습니다. 폴더에 쓸 수 있는지 확인하고 다시 시도하세요.'
 }

@@ -338,11 +338,12 @@ export const ru: Messages = {
   vs_stSynthError: 'Ошибка синтеза: {error}',
   vs_stReset: 'Восстановлены значения Капри.',
 
-// System prompt editor (Capri // Brain settings)
-  sp_title: 'System prompt (personality)',
-  sp_hint: 'This is who Capri is. Write {name} where her name for you should go. Her tool, voice and look rules are always added after this text, and the change applies from your next message.',
-  sp_custom: 'Custom',
-  sp_default: 'Default',
-  sp_reset: 'Restore default',
-  sp_chars: '{n} characters'
+  // System prompt editor (Capri // Brain settings)
+  sp_title: 'Системный промпт (личность)',
+  sp_hint: 'Это то, кто такая Capri. Пиши {name} там, где должно стоять имя, которым она тебя называет. Её правила инструментов, голоса и взглядов всегда добавляются после этого текста, а изменение действует с твоего следующего сообщения.',
+  sp_custom: 'Свой',
+  sp_default: 'По умолчанию',
+  sp_reset: 'Восстановить по умолчанию',
+  sp_chars: 'Символов: {n}',
+  sp_saveError: 'Не удалось сохранить изменения. Проверь, что в папку можно записывать, и попробуй снова.'
 }

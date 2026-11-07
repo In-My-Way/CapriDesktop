@@ -342,7 +342,8 @@ export const en = {
   sp_custom: 'Custom',
   sp_default: 'Default',
   sp_reset: 'Restore default',
-  sp_chars: '{n} characters'
+  sp_chars: '{n} characters',
+  sp_saveError: 'Could not save the changes. Check that the folder can be written to and try again.'
 }
 
 export type Messages = typeof en

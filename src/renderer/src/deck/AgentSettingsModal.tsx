@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Cpu, RefreshCw, RotateCcw, X } from 'lucide-react' // RotateCcw added
+import { Cpu, RefreshCw, RotateCcw, X } from 'lucide-react'
 import { LlmProviderForm, LlmProviderFormHandle } from '../components/LlmProviderForm'
 import { useAgentStore } from '../stores/useAgentStore'
 import { useT } from '../utils/useUiLang'
@@ -22,6 +22,7 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
   const [savedPrompt, setSavedPrompt] = useState('')
   const [defaultPrompt, setDefaultPrompt] = useState('')
   const [promptLoaded, setPromptLoaded] = useState(false)
+  const [saveError, setSaveError] = useState(false)
 
   const scan = async () => {
     setIsScanning(true)
@@ -41,6 +42,7 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
   useEffect(() => {
     if (!isOpen) return
     setPromptLoaded(false)
+    setSaveError(false)
     window.api.agent
       .getSystemPrompt()
       .then((info) => {
@@ -54,21 +56,23 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
 
   const handleSave = async () => {
     if (!(await formRef.current?.save())) return
- try {
-    // Save the system prompt only if it was loaded and changed (applies from the next message)
-    if (promptLoaded && promptText !== savedPrompt) await window.api.agent.setSystemPrompt(promptText)
-    if (provider === 'local' && modelInput) {
-      setLlmConfig({ model: modelInput })
-      await window.api.agent.setConfig({ model: modelInput })
+    setSaveError(false)
+    try {
+      // The system prompt is saved only if it was loaded and changed (applies from the next message)
+      if (promptLoaded && promptText !== savedPrompt) await window.api.agent.setSystemPrompt(promptText)
+      if (provider === 'local' && modelInput) {
+        setLlmConfig({ model: modelInput })
+        await window.api.agent.setConfig({ model: modelInput })
+      }
+      onClose()
+    } catch (error) {
+      // The window stays open so nothing written is lost
+      console.error('[AgentSettings] Could not save:', error)
+      setSaveError(true)
     }
-    onClose()
-  } catch (error) {
-    console.error("Failed to save configuration:", error)
-    
-    // Keeps the modal open and gives the user explicit feedback
-    alert("Failed to save changes. Please check file permissions and try again.")
   }
-}
+
+  if (!isOpen) return null
 
   // True when the text in the box is not the built-in prompt
   const promptIsCustom = promptLoaded && promptText.trim() !== defaultPrompt.trim()
@@ -137,7 +141,7 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
             </div>
             <div className="cp-frame">
               <textarea
-		maxLength={20000}
+                maxLength={20000}
                 value={promptText}
                 onChange={(e) => setPromptText(e.target.value)}
                 disabled={!promptLoaded}
@@ -164,6 +168,7 @@ export const AgentSettingsModal: React.FC<AgentSettingsModalProps> = ({ isOpen, 
           >
             {t('llm_setupAgain')}
           </button>
+          {saveError && <span className="self-center text-[13px] text-[var(--cp-red-hi)]">{t('sp_saveError')}</span>}
           <button onClick={onClose} className="cp-frame cp-btn-ghost px-4 py-2 text-[14px]">
             {t('cancel')}
           </button>
