@@ -269,7 +269,7 @@ export function registerIpcHandlers(): void {
       const lang = s.textLang && s.textLang !== 'auto' ? s.textLang : consciousnessService.getPreferredLanguage()
       setTimeout(() => {
         agentManager.setCompanionState('talking')
-        agentManager.setCompanionSpeech(welcomeSpeech(lang), 22000, true)
+        agentManager.setCompanionSpeech(welcomeSpeech(lang, consciousnessService.getHotkeys().talk), 22000, true)
       }, 1500)
     }
     return true
