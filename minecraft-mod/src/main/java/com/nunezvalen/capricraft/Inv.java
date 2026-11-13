@@ -7,7 +7,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -57,8 +57,8 @@ public final class Inv {
 		return -1;
 	}
 
-	public static void click(Minecraft mc, AbstractContainerMenu menu, int slot, int button, ClickType type) {
-		mc.gameMode.handleInventoryMouseClick(menu.containerId, slot, button, type, mc.player);
+	public static void click(Minecraft mc, AbstractContainerMenu menu, int slot, int button, ContainerInput type) {
+		mc.gameMode.handleContainerInput(menu.containerId, slot, button, type, mc.player);
 	}
 
 	/**
@@ -74,14 +74,14 @@ public final class Inv {
 			int from = menuSlotOf(player, menu, index);
 			if (from < 0) return false;
 			int available = player.getInventory().getItem(index).getCount();
-			click(mc, menu, from, 0, ClickType.PICKUP);
+			click(mc, menu, from, 0, ContainerInput.PICKUP);
 			while (available > 0 && placed < targets.length) {
-				click(mc, menu, targets[placed], 1, ClickType.PICKUP);
+				click(mc, menu, targets[placed], 1, ContainerInput.PICKUP);
 				available--;
 				placed++;
 			}
 			// Whatever is left on the cursor goes back to its slot
-			if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ClickType.PICKUP);
+			if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ContainerInput.PICKUP);
 		}
 		return true;
 	}
@@ -93,9 +93,9 @@ public final class Inv {
 		if (index < 0) return false;
 		int from = menuSlotOf(player, menu, index);
 		if (from < 0) return false;
-		click(mc, menu, from, 0, ClickType.PICKUP);
-		click(mc, menu, target, 0, ClickType.PICKUP);
-		if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ClickType.PICKUP);
+		click(mc, menu, from, 0, ContainerInput.PICKUP);
+		click(mc, menu, target, 0, ContainerInput.PICKUP);
+		if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ContainerInput.PICKUP);
 		return true;
 	}
 
@@ -108,7 +108,7 @@ public final class Inv {
 			// Only the plain inventory can swap into the hotbar
 			if (player.containerMenu != player.inventoryMenu) player.closeContainer();
 			int from = menuSlotOf(player, player.inventoryMenu, index);
-			click(mc, player.inventoryMenu, from, 8, ClickType.SWAP);
+			click(mc, player.inventoryMenu, from, 8, ContainerInput.SWAP);
 			index = 8;
 		}
 		player.getInventory().setSelectedSlot(index);

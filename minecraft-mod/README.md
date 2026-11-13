@@ -39,6 +39,6 @@ Needs **JDK 25**.
    **own game directory** in the launcher, so it doesn't load mods made for other versions.
 2. In that profile's `mods` folder put:
    - Fabric API for 26.3
-   - `baritone-standalone-fabric-1.20.0.jar`
+   - `baritone-api-fabric-1.20.0.jar` (the full Baritone; the "standalone" build hides the API this mod calls)
    - `capricraft-0.1.0.jar`
 3. Start the game, join a world, and ask Capri.

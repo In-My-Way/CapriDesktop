@@ -12,7 +12,7 @@ dependencies {
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
 	// Baritone walks and mines for her. Only its API is needed to build: the player installs the
-	// full Baritone (baritone-standalone-fabric) next to this mod. Put the jar from
+	// same jar (baritone-api-fabric, the full Baritone) next to this mod; the standalone build hides its API. Put the jar from
 	// https://github.com/cabaletta/baritone/releases/tag/v1.20.0 in libs/
 	compileOnly files("libs/baritone-api-fabric-${project.baritone_version}.jar")
 }

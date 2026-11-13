@@ -14,14 +14,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.tags.ItemTags;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.AbstractFurnaceMenu;
-import net.minecraft.world.inventory.ClickType;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import org.lwjgl.glfw.GLFW;
+import com.mojang.blaze3d.platform.InputConstants;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -108,7 +108,7 @@ public final class TaskRunner {
 		}
 
 		// K (with no menu open) gives the player their hands back
-		boolean stopDown = mc.screen == null && GLFW.glfwGetKey(GLFW.glfwGetCurrentContext(), GLFW.GLFW_KEY_K) == GLFW.GLFW_PRESS;
+		boolean stopDown = mc.gui.screen() == null && InputConstants.isKeyDown(InputConstants.KEY_K);
 		if (stopDown && !stopKeyWasDown && action != null) {
 			end("stopped", "player");
 		}
@@ -531,7 +531,7 @@ public final class TaskRunner {
 				case 2 -> {
 					AbstractContainerMenu menu = player.containerMenu;
 					if (menu.getSlot(0).hasItem()) {
-						Inv.click(mc, menu, 0, 0, ClickType.QUICK_MOVE);
+						Inv.click(mc, menu, 0, 0, ContainerInput.QUICK_MOVE);
 						phase = 3;
 						wait = 0;
 					} else if (++wait > 30) {
@@ -563,7 +563,7 @@ public final class TaskRunner {
 		private void clearGrid(Minecraft mc, AbstractContainerMenu menu) {
 			int gridEnd = onTable ? 9 : 4;
 			for (int slot = 1; slot <= gridEnd; slot++) {
-				if (menu.getSlot(slot).hasItem()) Inv.click(mc, menu, slot, 0, ClickType.QUICK_MOVE);
+				if (menu.getSlot(slot).hasItem()) Inv.click(mc, menu, slot, 0, ContainerInput.QUICK_MOVE);
 			}
 		}
 	}
@@ -638,12 +638,12 @@ public final class TaskRunner {
 						phase = 2; // the player or the game closed it: open it again
 						return false;
 					}
-					if (menu.getSlot(2).hasItem() && (++wait % 10 == 0)) Inv.click(mc, menu, 2, 0, ClickType.QUICK_MOVE);
+					if (menu.getSlot(2).hasItem() && (++wait % 10 == 0)) Inv.click(mc, menu, 2, 0, ContainerInput.QUICK_MOVE);
 					boolean done = Inv.count(player, output) >= target;
 					boolean stuck = !menu.getSlot(0).hasItem() && !menu.getSlot(2).hasItem() && !done;
 					if (done || stuck) {
-						if (menu.getSlot(0).hasItem()) Inv.click(mc, menu, 0, 0, ClickType.QUICK_MOVE);
-						if (menu.getSlot(1).hasItem()) Inv.click(mc, menu, 1, 0, ClickType.QUICK_MOVE);
+						if (menu.getSlot(0).hasItem()) Inv.click(mc, menu, 0, 0, ContainerInput.QUICK_MOVE);
+						if (menu.getSlot(1).hasItem()) Inv.click(mc, menu, 1, 0, ContainerInput.QUICK_MOVE);
 						player.closeContainer();
 						if (!done) {
 							end("failed", "smelting_stopped");
@@ -711,7 +711,7 @@ public final class TaskRunner {
 	}
 
 	private static void say(Minecraft mc, String text) {
-		if (mc.player != null) mc.player.displayClientMessage(Component.literal("§d[Capri]§r " + text), false);
+		if (mc.player != null) mc.player.sendSystemMessage(Component.literal("§d[Capri]§r " + text));
 	}
 
 	List<String> debugInventory(LocalPlayer player) {
