@@ -61,42 +61,69 @@ public final class Inv {
 		mc.gameMode.handleContainerInput(menu.containerId, slot, button, type, mc.player);
 	}
 
+	/** One menu slot to fill: with one item (right click) or a whole stack (left click) */
+	public record Fill(int slot, Predicate<ItemStack> what, boolean wholeStack) {}
+
+	/** The next click toward filling the slots: a slot and a mouse button */
+	public record Move(int slot, int button) {}
+
+	public static final Move DONE = new Move(-1, -1);
+	public static final Move MISSING = new Move(-2, -2);
+
 	/**
-	 * Puts one matching item into each of the given menu slots: picks the stack up, drops one item
-	 * per slot with a right click, and puts the rest back where it was. False if she runs out.
+	 * Looks at the menu as it is now and picks the one click that gets the slots closer to filled,
+	 * the way a person does it: pick a stack up, drop one in each slot that wants it, put the rest
+	 * back. DONE when every slot has something, MISSING when she has nothing left for one.
 	 */
-	public static boolean placeOneEach(Minecraft mc, AbstractContainerMenu menu, Predicate<ItemStack> what, int... targets) {
-		LocalPlayer player = mc.player;
-		int placed = 0;
-		while (placed < targets.length) {
-			int index = find(player, what);
-			if (index < 0) return false;
-			int from = menuSlotOf(player, menu, index);
-			if (from < 0) return false;
-			int available = player.getInventory().getItem(index).getCount();
-			click(mc, menu, from, 0, ContainerInput.PICKUP);
-			while (available > 0 && placed < targets.length) {
-				click(mc, menu, targets[placed], 1, ContainerInput.PICKUP);
-				available--;
-				placed++;
+	public static Move nextFill(LocalPlayer player, AbstractContainerMenu menu, java.util.List<Fill> fills) {
+		ItemStack carried = menu.getCarried();
+		if (!carried.isEmpty()) {
+			for (Fill f : fills) {
+				if (!menu.getSlot(f.slot()).hasItem() && f.what().test(carried)) return new Move(f.slot(), f.wholeStack() ? 0 : 1);
 			}
-			// Whatever is left on the cursor goes back to its slot
-			if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ContainerInput.PICKUP);
+			// Nothing else wants it: back into the inventory
+			int home = emptyOrSame(player, menu, carried);
+			return home >= 0 ? new Move(home, 0) : DONE;
 		}
-		return true;
+		for (Fill f : fills) {
+			if (menu.getSlot(f.slot()).hasItem()) continue;
+			int index = find(player, f.what());
+			if (index < 0) return MISSING;
+			int from = menuSlotOf(player, menu, index);
+			return from < 0 ? MISSING : new Move(from, 0);
+		}
+		return DONE;
 	}
 
-	/** Moves a whole matching stack into one menu slot (a furnace's input or fuel) */
-	public static boolean placeStack(Minecraft mc, AbstractContainerMenu menu, Predicate<ItemStack> what, int target) {
-		LocalPlayer player = mc.player;
-		int index = find(player, what);
-		if (index < 0) return false;
-		int from = menuSlotOf(player, menu, index);
-		if (from < 0) return false;
-		click(mc, menu, from, 0, ContainerInput.PICKUP);
-		click(mc, menu, target, 0, ContainerInput.PICKUP);
-		if (!menu.getCarried().isEmpty()) click(mc, menu, from, 0, ContainerInput.PICKUP);
-		return true;
+	/** An inventory slot in the menu where the carried stack can go back: one like it, or an empty one */
+	private static int emptyOrSame(LocalPlayer player, AbstractContainerMenu menu, ItemStack carried) {
+		int empty = -1;
+		for (Slot slot : menu.slots) {
+			if (slot.container != player.getInventory() || slot.getContainerSlot() >= MAIN_SLOTS) continue;
+			ItemStack here = slot.getItem();
+			if (here.isEmpty()) {
+				if (empty < 0) empty = slot.index;
+			} else if (ItemStack.isSameItemSameComponents(here, carried) && here.getCount() < here.getMaxStackSize()) {
+				return slot.index;
+			}
+		}
+		return empty;
+	}
+
+	/**
+	 * Turns her head a step toward a point, the way a person looks at something: true once she's
+	 * looking at it.
+	 */
+	public static boolean lookTowards(LocalPlayer player, Vec3 at, float maxStep) {
+		Vec3 eyes = player.getEyePosition();
+		double dx = at.x - eyes.x, dy = at.y - eyes.y, dz = at.z - eyes.z;
+		float yaw = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
+		float pitch = (float) -Math.toDegrees(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)));
+		float newYaw = net.minecraft.util.Mth.approachDegrees(player.getYRot(), yaw, maxStep);
+		float newPitch = net.minecraft.util.Mth.approachDegrees(player.getXRot(), pitch, maxStep);
+		player.setYRot(newYaw);
+		player.setXRot(newPitch);
+		return Math.abs(net.minecraft.util.Mth.wrapDegrees(newYaw - yaw)) < 1f && Math.abs(newPitch - pitch) < 1f;
 	}
 
 	/** Puts a matching item in her hand: straight from the hotbar, or swapped into its last slot */

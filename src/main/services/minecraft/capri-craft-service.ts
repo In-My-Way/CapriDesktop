@@ -16,7 +16,7 @@ export type CraftTask =
 
 interface CraftEvent {
   id: number
-  kind: 'started' | 'step' | 'got' | 'placed' | 'crafted' | 'smelted' | 'done' | 'failed' | 'stopped'
+  kind: 'started' | 'step' | 'got' | 'placed' | 'crafted' | 'smelted' | 'done' | 'failed' | 'stopped' | 'fled'
   detail: string
 }
 
@@ -27,6 +27,8 @@ interface CraftStatus {
   target?: string
   count?: number
   step?: string
+  have?: number
+  need?: number
   events?: CraftEvent[]
 }
 
@@ -211,6 +213,8 @@ class CapriCraftService {
 
   private startPolling(): void {
     this.running = true
+    this.lastStep = ''
+    this.lastSpokeAt = Date.now()
     if (this.polling) return
     this.polling = setInterval(() => void this.poll(), 1500)
   }
@@ -221,6 +225,39 @@ class CapriCraftService {
     this.polling = null
   }
 
+  // What she said last, so she doesn't talk over herself or repeat the same thing
+  private lastStep = ''
+  private lastSpokeAt = 0
+  private busyUntil = 0
+  private queued: string[] = []
+  private flushTimer: NodeJS.Timeout | null = null
+
+  /** One line at a time: what comes in while she's still talking waits, and goes out together */
+  private say(line: string): void {
+    this.queued.push(line)
+    this.flush()
+  }
+
+  private flush(): void {
+    const now = Date.now()
+    if (now < this.busyUntil) {
+      if (!this.flushTimer) {
+        this.flushTimer = setTimeout(() => {
+          this.flushTimer = null
+          this.flush()
+        }, this.busyUntil - now + 50)
+      }
+      return
+    }
+    // Only the first emotion tag stays: it sets her face for the whole line
+    const parts = this.queued.splice(0)
+    if (!parts.length) return
+    const line = parts.map((p, i) => (i === 0 ? p : p.replace(/^\s*\[[a-z ]+\]\s*/i, ''))).join(' ').trim()
+    this.speak(line)
+    this.lastSpokeAt = now
+    this.busyUntil = now + Math.max(3500, line.length * 70)
+  }
+
   private async poll(): Promise<void> {
     const status = await bridge<CraftStatus>(`/status?since=${this.lastEvent}`)
     if (!status) {
@@ -228,43 +265,144 @@ class CapriCraftService {
       this.stopPolling()
       return
     }
+    const lines: string[] = []
     for (const event of status.events || []) {
       this.lastEvent = Math.max(this.lastEvent, event.id)
-      const line = this.lineFor(event)
-      if (line) this.speak(line)
+      const line = this.lineFor(event, status.target || '')
+      if (line) lines.push(line)
+    }
+    if (lines.length) this.say(lines.join(' '))
+    else if (status.state === 'running' && Date.now() - this.lastSpokeAt > 45000) {
+      // A long search: tell the player how it's going
+      const update = this.progressLine(status)
+      if (update) this.say(update)
     }
     if (status.state === 'idle') this.stopPolling()
   }
 
-  /** What she says about one thing the mod did; null for the small stuff (planks, sticks) */
-  private lineFor(e: CraftEvent): string | null {
+  private pick(options: string[]): string {
+    return options[Math.floor(Math.random() * options.length)]
+  }
+
+  /** What it's all for, given what she was asked */
+  private why(target: string): [string, string] {
+    if (target === 'diamond') return ['para los diamantes', 'for the diamonds']
+    if (target === 'iron_pickaxe') return ['para el pico de hierro', 'for the iron pickaxe']
+    if (target === 'iron_ingot') return ['para sacar el hierro', 'to get the iron']
+    return ['', '']
+  }
+
+  /** What she says about one thing the mod did */
+  private lineFor(e: CraftEvent, target: string): string | null {
     const es = this.es
     const d = e.detail || ''
     switch (e.kind) {
       case 'step':
-        if (d === 'chop wood') return es ? '[happy] Primero, madera. Voy a talar un árbol.' : '[happy] Wood first. Going to chop a tree.'
-        if (d === 'mine stone') return es ? '[happy] Ahora piedra, para un pico mejor.' : '[happy] Now stone, for a better pickaxe.'
-        if (d === 'mine iron') return es ? '[excited] Voy a buscar hierro.' : '[excited] Going to look for iron.'
-        if (d === 'mine diamonds') return es ? '[excited] ¡Ahora sí, a buscar diamantes!' : '[excited] Now for the diamonds!'
-        if (d === 'mine coal') return es ? '[happy] Buscando carbón.' : '[happy] Looking for coal.'
-        if (d === 'smelt iron') return es ? '[happy] Fundiendo el hierro, dame unos segundos.' : '[happy] Smelting the iron, give me a few seconds.'
+        if (d === this.lastStep) return null
+        this.lastStep = d
+        return this.stepLine(d, target)
+      case 'got':
+        if (d === 'chop wood') return es ? this.pick(['[happy] Listo, ya tengo madera.', '[happy] Bueno, madera suficiente.']) : this.pick(['[happy] Got the wood.', '[happy] Okay, enough wood.'])
+        if (d === 'mine stone') return es ? '[happy] Ya tengo piedra.' : '[happy] Got the stone.'
+        if (d === 'mine iron') return es ? this.pick(['[excited] ¡Encontré hierro!', '[excited] ¡Ahí está el hierro!']) : this.pick(['[excited] Found iron!', '[excited] There is the iron!'])
+        if (d === 'mine diamonds') return es ? '[excited] ¡Diamantes! ¡Los tengo!' : '[excited] Diamonds! Got them!'
+        if (d === 'mine coal') return es ? '[happy] Ya tengo el carbón.' : '[happy] Got the coal.'
         return null
       case 'crafted':
-        if (d.endsWith('wooden_pickaxe')) return es ? '[happy] Me hice un pico de madera.' : '[happy] Made a wooden pickaxe.'
-        if (d.endsWith('stone_pickaxe')) return es ? '[happy] Pico de piedra, listo.' : '[happy] Stone pickaxe, done.'
-        if (d.endsWith('iron_pickaxe')) return es ? '[excited] ¡Pico de hierro! Ya puedo picar diamantes.' : '[excited] Iron pickaxe! Now I can mine diamonds.'
-        if (d.endsWith('furnace')) return es ? '[happy] Me armé un horno.' : '[happy] Built a furnace.'
+        if (d.endsWith('wooden_pickaxe')) return es ? '[proud] Pico de madera, hecho.' : '[proud] Wooden pickaxe, done.'
+        if (d.endsWith('stone_pickaxe')) return es ? '[proud] Pico de piedra listo. Mucho mejor.' : '[proud] Stone pickaxe ready. Much better.'
+        if (d.endsWith('iron_pickaxe')) return es ? '[excited] ¡Pico de hierro! Con esto ya puedo picar diamantes.' : '[excited] Iron pickaxe! With this I can mine diamonds.'
+        if (d.endsWith('furnace')) return es ? '[happy] Horno armado.' : '[happy] Furnace built.'
         return null
+      case 'smelted':
+        return es ? '[happy] Listo, hierro fundido.' : '[happy] Done, the iron is smelted.'
       case 'done':
         return es ? '[excited] ¡Listo! Ya tenés lo que me pediste. Te devuelvo el control.' : '[excited] Done! You have what you asked for. Control is yours again.'
       case 'stopped':
         if (d === 'replaced') return null
         return es ? '[happy] Ok, te devuelvo el control.' : '[happy] Okay, control is yours again.'
+      case 'fled':
+        return es
+          ? '[worried] ¡Me quedaban dos corazones! Salí al menú antes de que nos maten y perdamos todo. Cuando quieras, entrá de nuevo y comé algo.'
+          : "[worried] I was down to two hearts! I left to the title screen before we died and lost everything. Go back in and eat something when you're ready."
       case 'failed':
         return this.failLine(d)
       default:
         return null
     }
+  }
+
+  /** What she's about to do, and why */
+  private stepLine(step: string, target: string): string | null {
+    const es = this.es
+    const [whyEs, whyEn] = this.why(target)
+    const forEs = whyEs ? ` ${whyEs}` : ''
+    const forEn = whyEn ? ` ${whyEn}` : ''
+    switch (step) {
+      case 'chop wood':
+        return es
+          ? this.pick([`[happy] No tengo pico, así que primero madera. Voy a talar un árbol${forEs}.`, '[happy] Arranco por lo básico: madera. Busco un árbol.'])
+          : this.pick([`[happy] No pickaxe yet, so wood first. Going to chop a tree${forEn}.`, '[happy] Starting with the basics: wood. Looking for a tree.'])
+      case 'craft planks':
+        return es ? '[happy] Hago tablas con los troncos.' : '[happy] Turning the logs into planks.'
+      case 'craft sticks':
+        return es ? '[happy] Unos palos para el mango.' : '[happy] Some sticks for the handle.'
+      case 'craft crafting table':
+        return es ? '[happy] Me armo una mesa de crafteo.' : '[happy] Making a crafting table.'
+      case 'place crafting table':
+        return es ? '[happy] La pongo acá.' : '[happy] Putting it down here.'
+      case 'back to the crafting table':
+        return es ? '[happy] Vuelvo a la mesa que dejé, así no gasto madera.' : "[happy] Going back to the table I left, so I don't waste wood."
+      case 'craft wooden pickaxe':
+        return es ? '[happy] Y ahora, un pico de madera.' : '[happy] And now, a wooden pickaxe.'
+      case 'mine stone':
+        return es ? '[happy] Ahora piedra, para un pico mejor.' : '[happy] Now stone, for a better pickaxe.'
+      case 'craft stone pickaxe':
+        return es ? '[happy] Me hago el pico de piedra.' : '[happy] Making the stone pickaxe.'
+      case 'mine iron':
+        return es
+          ? `[excited] Ahora a buscar hierro${forEs}. Voy a cavar hacia abajo, sin trampa: solo lo que vea.`
+          : `[excited] Now to find iron${forEn}. I'll dig down and look, no cheating: only what I can see.`
+      case 'craft furnace':
+        return es ? '[happy] Necesito un horno para fundir el hierro.' : '[happy] I need a furnace to smelt the iron.'
+      case 'place furnace':
+        return es ? '[happy] Pongo el horno.' : '[happy] Putting the furnace down.'
+      case 'smelt iron':
+        return es ? '[happy] A fundir el hierro. Tarda unos segundos por lingote.' : '[happy] Smelting the iron. It takes a few seconds per ingot.'
+      case 'craft iron pickaxe':
+        return es ? '[excited] ¡Ahora el pico de hierro!' : '[excited] Now the iron pickaxe!'
+      case 'mine diamonds':
+        return es
+          ? '[excited] ¡Ahora sí, a buscar diamantes! Bajo bien hondo y cavo un túnel hasta verlos. Puede tardar un rato.'
+          : "[excited] Now for the diamonds! I'm going deep and digging a tunnel until I see some. It might take a while."
+      case 'mine coal':
+        return es ? '[happy] Busco carbón.' : '[happy] Looking for coal.'
+      default:
+        return null
+    }
+  }
+
+  /** How a long search is going */
+  private progressLine(status: CraftStatus): string | null {
+    const es = this.es
+    const things: Record<string, [string, string]> = {
+      'mine iron': ['el hierro', 'iron'],
+      'mine diamonds': ['los diamantes', 'diamonds'],
+      'mine coal': ['el carbón', 'coal'],
+      'mine stone': ['la piedra', 'stone'],
+      'chop wood': ['la madera', 'wood']
+    }
+    const name = things[status.step || '']
+    if (!name) return null
+    const counted =
+      status.have !== undefined && status.need !== undefined && status.have > 0
+        ? es
+          ? ` Ya tengo ${status.have} de ${status.need}.`
+          : ` I have ${status.have} of ${status.need}.`
+        : ''
+    return es
+      ? this.pick([`[thoughtful] Sigo buscando ${name[0].replace(/^(el|la|los) /, '')}.${counted}`, `[thoughtful] Todavía nada... sigo cavando.${counted}`, `[curious] Paciencia, ${name[0]} tiene que estar por acá.${counted}`])
+      : this.pick([`[thoughtful] Still looking for ${name[1]}.${counted}`, `[thoughtful] Nothing yet... still digging.${counted}`, `[curious] Patience, the ${name[1]} has to be around here.${counted}`])
   }
 
   private failLine(reason: string): string {
@@ -275,6 +413,7 @@ class CapriCraftService {
         : "[sad] I can't find any more of what I need around here. Take me somewhere else and ask again."
     }
     if (reason.startsWith('no_room_for')) return es ? '[sad] No tengo lugar para poner la mesa o el horno acá.' : "[sad] There's no room here to put down the table or the furnace."
+    if (reason === 'died') return es ? '[sad] Me mataron... Perdón. Te devuelvo el control.' : '[sad] I got killed... Sorry. Control is yours again.'
     if (reason === 'not_in_world') return es ? '[sad] Saliste del mundo, así que paré.' : '[sad] You left the world, so I stopped.'
     if (reason.startsWith('unknown')) return es ? '[curious] No sé qué es eso en Minecraft.' : "[curious] I don't know what that is in Minecraft."
     return es ? `[sad] Algo salió mal y no pude terminar (${reason}). Te devuelvo el control.` : `[sad] Something went wrong and I couldn't finish (${reason}). Control is yours again.`

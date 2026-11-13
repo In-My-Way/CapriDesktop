@@ -3,6 +3,7 @@ package com.nunezvalen.capricraft;
 import baritone.api.BaritoneAPI;
 import baritone.api.IBaritone;
 import baritone.api.pathing.goals.GoalBlock;
+import baritone.api.pathing.goals.GoalNear;
 import baritone.api.pathing.goals.GoalXZ;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -22,11 +23,17 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import com.mojang.blaze3d.platform.InputConstants;
+import baritone.api.Settings;
+import net.minecraft.client.gui.screens.inventory.InventoryScreen;
+import net.minecraft.world.entity.monster.Monster;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Predicate;
 
@@ -74,6 +81,10 @@ public final class TaskRunner {
 	private BlockPos furnacePos = null;
 	private boolean stopKeyWasDown = false;
 
+	/** Her mouse in the menus */
+	final Hand hand = new Hand();
+	private final java.util.Random random = new java.util.Random();
+
 	// ---- Called from the bridge thread ----
 
 	public void submit(JsonObject task) {
@@ -116,13 +127,70 @@ public final class TaskRunner {
 
 		if (action != null) {
 			try {
-				run(mc);
+				if (player.isDeadOrDying()) {
+					end("failed", "died");
+				} else if (player.getHealth() <= 4f) {
+					// Two hearts left: out to the title screen before she loses the player's things
+					end("fled", "low_health");
+					mc.schedule(mc::disconnectWithSavingScreen);
+				} else {
+					hand.tick(mc);
+					defend(mc, player);
+					if (!hand.busy()) run(mc);
+				}
 			} catch (RuntimeException e) {
 				CapriCraftClient.LOG.error("[CapriCraft] Step failed", e);
 				end("failed", "error");
 			}
 		}
 		snapshot();
+	}
+
+	/** A monster in arm's reach gets hit, when no menu is open and her arm is ready */
+	private void defend(Minecraft mc, LocalPlayer player) {
+		if (mc.gui.screen() != null || player.getAttackStrengthScale(0f) < 0.95f) return;
+		Monster nearest = null;
+		double best = 3.2 * 3.2;
+		for (Monster m : player.level().getEntitiesOfClass(Monster.class, player.getBoundingBox().inflate(3.5))) {
+			double d = player.distanceToSqr(m);
+			if (d < best && m.isAlive() && player.hasLineOfSight(m)) {
+				best = d;
+				nearest = m;
+			}
+		}
+		if (nearest == null) return;
+		Inv.lookTowards(player, nearest.getEyePosition(), 180f);
+		mc.gameMode.attack(player, nearest);
+	}
+
+	// Baritone settings she changes while she plays, and what they were before
+	private final Map<Settings.Setting<Object>, Object> savedSettings = new HashMap<>();
+
+	@SuppressWarnings("unchecked")
+	private <T> void setting(Settings.Setting<T> s, T value) {
+		Settings.Setting<Object> any = (Settings.Setting<Object>) (Object) s;
+		savedSettings.putIfAbsent(any, any.value);
+		s.value = value;
+	}
+
+	/** Plays like a person: no boxes through walls, her head turns where she looks, quiet chat */
+	private void playLikeAPerson() {
+		Settings s = BaritoneAPI.getSettings();
+		setting(s.allowInventory, true);
+		setting(s.renderGoal, false);
+		setting(s.renderPath, false);
+		setting(s.renderSelectionBoxes, false);
+		setting(s.renderGoalXZBeacon, false);
+		setting(s.renderCachedChunks, false);
+		setting(s.chatDebug, false);
+		setting(s.freeLook, false);
+		setting(s.smoothLook, true);
+		setting(s.legitMine, false);
+	}
+
+	private void restoreSettings() {
+		savedSettings.forEach((s, v) -> s.value = v);
+		savedSettings.clear();
 	}
 
 	private void accept(Minecraft mc, JsonObject task) {
@@ -148,7 +216,8 @@ public final class TaskRunner {
 		startedAt = System.currentTimeMillis();
 		current = null;
 		step = "planning";
-		BaritoneAPI.getSettings().allowInventory.value = true;
+		playLikeAPerson();
+		hand.reset();
 		event("started", what + ":" + target + ":" + amount);
 		say(mc, "Capri took over: " + what + " " + (target == null ? "" : target) + " (press K to take back control)");
 	}
@@ -177,8 +246,13 @@ public final class TaskRunner {
 		baritone().getPathingBehavior().cancelEverything();
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.player != null && mc.player.containerMenu != mc.player.inventoryMenu) mc.player.closeContainer();
+		hand.reset();
+		restoreSettings();
 		event(how, detail);
-		say(mc, how.equals("done") ? "Done! Control is yours again." : how.equals("stopped") ? "Stopped. Control is yours again." : "I couldn't finish (" + detail + "). Control is yours again.");
+		say(mc, how.equals("done") ? "Done! Control is yours again."
+			: how.equals("stopped") ? "Stopped. Control is yours again."
+			: how.equals("fled") ? "Two hearts left! Leaving to the title screen before we lose everything."
+			: "I couldn't finish (" + detail + "). Control is yours again.");
 		action = null;
 		target = null;
 		current = null;
@@ -349,6 +423,10 @@ public final class TaskRunner {
 	private Step needTable(LocalPlayer player, int planksReserved) {
 		if (near(player, tablePos, Blocks.CRAFTING_TABLE)) return null;
 		if (Inv.count(player, Items.CRAFTING_TABLE) > 0) return new PlaceStep("place crafting table", Items.CRAFTING_TABLE, true);
+		// Walking back to the one she left is cheaper than four planks, unless it's far
+		if (tablePos != null && player.level().getBlockState(tablePos).is(Blocks.CRAFTING_TABLE) && Inv.within(player, tablePos, 48.0)) {
+			return new WalkStep("back to the crafting table", tablePos);
+		}
 		return needTableItem(player, planksReserved);
 	}
 
@@ -384,16 +462,23 @@ public final class TaskRunner {
 		private final Block[] blocks;
 		private boolean started = false;
 		private int idleTicks = 0;
-		private final long deadline = System.currentTimeMillis() + 15 * 60 * 1000;
+		private final Integer legitY;
+		private final long deadline;
 
 		MineStep(String name, int quantity, Predicate<ItemStack> counts, Block... blocks) {
 			this.name = name;
 			this.quantity = quantity;
 			this.counts = counts;
 			this.blocks = blocks;
+			this.legitY = legitLevel(blocks);
+			// Without seeing through walls, diamonds take a while
+			this.deadline = System.currentTimeMillis() + (legitY != null && legitY < 0 ? 30 : 15) * 60 * 1000;
 		}
 
 		public String name() { return name; }
+
+		int have(LocalPlayer player) { return Inv.count(player, counts); }
+		int need() { return quantity; }
 
 		public boolean tick(Minecraft mc) {
 			if (Inv.count(mc.player, counts) >= quantity) {
@@ -403,6 +488,10 @@ public final class TaskRunner {
 			}
 			if (!started) {
 				if (mc.player.containerMenu != mc.player.inventoryMenu) mc.player.closeContainer();
+				// Ores only once she has seen them, digging at the height they're found at, like a person
+				Settings settings = BaritoneAPI.getSettings();
+				setting(settings.legitMine, legitY != null);
+				if (legitY != null) setting(settings.legitMineYLevel, legitY);
 				baritone().getMineProcess().mine(quantity, blocks);
 				started = true;
 				event("step", name);
@@ -418,12 +507,49 @@ public final class TaskRunner {
 		}
 	}
 
-	/** Puts a crafting table or a furnace down next to the player */
+	/** Baritone walks her up to a block she placed earlier */
+	final class WalkStep implements Step {
+		private final String name;
+		private final BlockPos pos;
+		private boolean started = false;
+		private int idleTicks = 0;
+
+		WalkStep(String name, BlockPos pos) {
+			this.name = name;
+			this.pos = pos;
+		}
+
+		public String name() { return name; }
+
+		public boolean tick(Minecraft mc) {
+			if (Inv.within(mc.player, pos, 3.5)) {
+				baritone().getPathingBehavior().cancelEverything();
+				return true;
+			}
+			if (!started) {
+				if (mc.player.containerMenu != mc.player.inventoryMenu) mc.player.closeContainer();
+				baritone().getCustomGoalProcess().setGoalAndPath(new GoalNear(pos, 2));
+				started = true;
+				event("step", name);
+				return false;
+			}
+			idleTicks = baritone().getCustomGoalProcess().isActive() ? 0 : idleTicks + 1;
+			if (idleTicks > 60) {
+				// Couldn't get there: forget it, and the next plan crafts a new one
+				if (pos.equals(tablePos)) tablePos = null;
+				return true;
+			}
+			return false;
+		}
+	}
+
+	/** Puts a crafting table or a furnace down next to the player, after a look at the spot */
 	final class PlaceStep implements Step {
 		private final String name;
 		private final Item item;
 		private final boolean isTable;
 		private BlockPos pos;
+		private int phase = 0;
 		private int wait = 0;
 
 		PlaceStep(String name, Item item, boolean isTable) {
@@ -436,39 +562,50 @@ public final class TaskRunner {
 
 		public boolean tick(Minecraft mc) {
 			LocalPlayer player = mc.player;
-			if (pos == null) {
-				if (player.containerMenu != player.inventoryMenu) player.closeContainer();
-				pos = Inv.placeSpot(player);
-				if (pos == null) {
-					end("failed", "no_room_for:" + name);
-					return true;
+			switch (phase) {
+				case 0 -> {
+					if (player.containerMenu != player.inventoryMenu) player.closeContainer();
+					pos = Inv.placeSpot(player);
+					if (pos == null) {
+						end("failed", "no_room_for:" + name);
+						return true;
+					}
+					if (!Inv.hold(mc, s -> s.is(item))) {
+						end("failed", "missing:" + name);
+						return true;
+					}
+					event("step", name);
+					phase = 1;
 				}
-				if (!Inv.hold(mc, s -> s.is(item))) {
-					end("failed", "missing:" + name);
-					return true;
+				case 1 -> {
+					if (Inv.lookTowards(player, new Vec3(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5), 14f)) {
+						Inv.placeAt(mc, pos);
+						phase = 2;
+						wait = 0;
+					}
 				}
-				Inv.placeAt(mc, pos);
-				return false;
-			}
-			if (player.level().getBlockState(pos).is(isTable ? Blocks.CRAFTING_TABLE : Blocks.FURNACE)) {
-				if (isTable) tablePos = pos; else furnacePos = pos;
-				event("placed", name);
-				return true;
-			}
-			if (++wait > 40) {
-				end("failed", "could_not_place:" + name);
-				return true;
+				default -> {
+					if (player.level().getBlockState(pos).is(isTable ? Blocks.CRAFTING_TABLE : Blocks.FURNACE)) {
+						if (isTable) tablePos = pos; else furnacePos = pos;
+						event("placed", name);
+						return true;
+					}
+					if (++wait > 40) {
+						end("failed", "could_not_place:" + name);
+						return true;
+					}
+				}
 			}
 			return false;
 		}
 	}
 
-	/** Lays the recipe out in the grid and takes the result */
+	/** Opens the menu, lays the recipe out with her mouse one click at a time, and takes the result */
 	final class CraftStep implements Step {
 		private final String name;
 		private final Item result; // null: whatever comes out (planks of any wood)
 		private final boolean onTable;
-		private final Ingredient[] ingredients;
+		private final List<Inv.Fill> fills = new ArrayList<>();
 		private int phase = 0;
 		private int wait = 0;
 		private int before = 0;
@@ -477,7 +614,9 @@ public final class TaskRunner {
 			this.name = name;
 			this.result = result;
 			this.onTable = onTable;
-			this.ingredients = ingredients;
+			for (Ingredient ing : ingredients) {
+				for (int slot : ing.slots()) fills.add(new Inv.Fill(slot, ing.what(), ing.wholeStack()));
+			}
 		}
 
 		public String name() { return name; }
@@ -486,26 +625,38 @@ public final class TaskRunner {
 			return result == null ? Inv.count(player, PLANKS) : Inv.count(player, result);
 		}
 
+		private int gridEnd() {
+			return onTable ? 9 : 4;
+		}
+
 		public boolean tick(Minecraft mc) {
 			LocalPlayer player = mc.player;
+			AbstractContainerMenu menu = player.containerMenu;
 			switch (phase) {
 				case 0 -> {
 					before = resultCount(player);
+					event("step", name);
+					if (menu != player.inventoryMenu) player.closeContainer();
 					if (onTable) {
 						if (!near(player, tablePos, Blocks.CRAFTING_TABLE)) {
 							end("failed", "table_gone");
 							return true;
 						}
-						if (player.containerMenu != player.inventoryMenu) player.closeContainer();
-						Inv.use(mc, tablePos);
-					} else if (player.containerMenu != player.inventoryMenu) {
-						player.closeContainer();
+						phase = 1;
+					} else {
+						mc.gui.setScreen(new InventoryScreen(player));
+						phase = 2;
 					}
-					phase = 1;
 					wait = 0;
 				}
 				case 1 -> {
-					AbstractContainerMenu menu = player.containerMenu;
+					if (Inv.lookTowards(player, Vec3.atCenterOf(tablePos), 14f)) {
+						Inv.use(mc, tablePos);
+						phase = 2;
+						wait = 0;
+					}
+				}
+				case 2 -> {
 					boolean ready = onTable ? menu instanceof CraftingMenu : menu == player.inventoryMenu;
 					if (!ready) {
 						if (++wait > 40) {
@@ -514,37 +665,48 @@ public final class TaskRunner {
 						}
 						return false;
 					}
-					for (Ingredient ing : ingredients) {
-						int[] slots = ing.slots();
-						boolean ok = ing.wholeStack()
-							? Inv.placeStack(mc, menu, ing.what(), slots[0])
-							: Inv.placeOneEach(mc, menu, ing.what(), slots);
-						if (!ok) {
-							clearGrid(mc, menu);
-							end("failed", "missing_ingredients:" + name);
-							return true;
-						}
-					}
-					phase = 2;
-					wait = 0;
+					// A look at the grid before she starts
+					hand.pause(8 + random.nextInt(8));
+					phase = 3;
 				}
-				case 2 -> {
-					AbstractContainerMenu menu = player.containerMenu;
-					if (menu.getSlot(0).hasItem()) {
-						Inv.click(mc, menu, 0, 0, ContainerInput.QUICK_MOVE);
-						phase = 3;
+				case 3 -> {
+					Inv.Move move = Inv.nextFill(player, menu, fills);
+					if (move == Inv.MISSING) {
+						finish(mc);
+						end("failed", "missing_ingredients:" + name);
+						return true;
+					}
+					if (move == Inv.DONE) {
+						hand.pause(4 + random.nextInt(4));
+						phase = 4;
 						wait = 0;
+					} else {
+						hand.click(move.slot(), move.button(), ContainerInput.PICKUP);
+					}
+				}
+				case 4 -> {
+					if (menu.getSlot(0).hasItem()) {
+						hand.click(0, 0, ContainerInput.QUICK_MOVE);
+						phase = 5;
 					} else if (++wait > 30) {
-						clearGrid(mc, menu);
+						finish(mc);
 						end("failed", "recipe_did_not_work:" + name);
 						return true;
 					}
 				}
-				case 3 -> {
-					if (++wait < 4) return false;
-					AbstractContainerMenu menu = player.containerMenu;
-					clearGrid(mc, menu);
-					if (onTable) player.closeContainer();
+				case 5 -> {
+					// Anything left in the grid goes back to the inventory
+					for (int slot = 1; slot <= gridEnd(); slot++) {
+						if (menu.getSlot(slot).hasItem()) {
+							hand.click(slot, 0, ContainerInput.QUICK_MOVE);
+							return false;
+						}
+					}
+					hand.pause(6 + random.nextInt(6));
+					phase = 6;
+				}
+				default -> {
+					finish(mc);
 					if (resultCount(player) <= before) {
 						end("failed", "nothing_crafted:" + name);
 						return true;
@@ -552,23 +714,18 @@ public final class TaskRunner {
 					event("crafted", result == null ? "planks" : id(result));
 					return true;
 				}
-				default -> {
-					return true;
-				}
 			}
 			return false;
 		}
 
-		/** Anything left in the grid goes back to the inventory */
-		private void clearGrid(Minecraft mc, AbstractContainerMenu menu) {
-			int gridEnd = onTable ? 9 : 4;
-			for (int slot = 1; slot <= gridEnd; slot++) {
-				if (menu.getSlot(slot).hasItem()) Inv.click(mc, menu, slot, 0, ContainerInput.QUICK_MOVE);
-			}
+		private void finish(Minecraft mc) {
+			hand.reset();
+			// Closing the menu hands back whatever is still in the grid or on the cursor
+			if (mc.gui.screen() != null) mc.player.closeContainer();
 		}
 	}
 
-	/** Places a furnace if needed, feeds it, and waits for the result */
+	/** Places a furnace if needed, feeds it with her mouse, and checks on it until it's done */
 	final class SmeltStep implements Step {
 		private final String name;
 		private final Predicate<ItemStack> input;
@@ -577,7 +734,9 @@ public final class TaskRunner {
 		private int phase = 0;
 		private int wait = 0;
 		private int target;
+		private long deadline;
 		private PlaceStep placing;
+		private final List<Inv.Fill> fills = new ArrayList<>();
 
 		SmeltStep(String name, Predicate<ItemStack> input, Item output, int quantity) {
 			this.name = name;
@@ -590,10 +749,18 @@ public final class TaskRunner {
 
 		public boolean tick(Minecraft mc) {
 			LocalPlayer player = mc.player;
+			AbstractContainerMenu menu = player.containerMenu;
+			if (phase > 1 && System.currentTimeMillis() > deadline) {
+				close(mc);
+				end("failed", "smelting_too_slow");
+				return true;
+			}
 			switch (phase) {
 				case 0 -> {
 					target = Inv.count(player, output) + quantity;
+					deadline = System.currentTimeMillis() + 4 * 60 * 1000;
 					if (near(player, furnacePos, Blocks.FURNACE)) {
+						event("step", name);
 						phase = 2;
 					} else {
 						placing = new PlaceStep("place furnace", Items.FURNACE, false);
@@ -603,16 +770,23 @@ public final class TaskRunner {
 				case 1 -> {
 					if (!placing.tick(mc)) return false;
 					if (action == null) return true; // placing failed and ended the task
+					event("step", name);
 					phase = 2;
 				}
 				case 2 -> {
-					if (player.containerMenu != player.inventoryMenu) player.closeContainer();
-					Inv.use(mc, furnacePos);
-					phase = 3;
-					wait = 0;
+					// Walk up to it, look at it, open it
+					if (!near(player, furnacePos, Blocks.FURNACE)) {
+						end("failed", "furnace_gone");
+						return true;
+					}
+					if (menu != player.inventoryMenu) player.closeContainer();
+					if (Inv.lookTowards(player, Vec3.atCenterOf(furnacePos), 14f)) {
+						Inv.use(mc, furnacePos);
+						phase = 3;
+						wait = 0;
+					}
 				}
 				case 3 -> {
-					AbstractContainerMenu menu = player.containerMenu;
 					if (!(menu instanceof AbstractFurnaceMenu)) {
 						if (++wait > 40) {
 							end("failed", "furnace_did_not_open");
@@ -620,52 +794,92 @@ public final class TaskRunner {
 						}
 						return false;
 					}
-					// Slot 0 what to smelt, 1 the fuel, 2 the result
-					if (!menu.getSlot(0).hasItem()) Inv.placeStack(mc, menu, input, 0);
-					if (!menu.getSlot(1).hasItem()) {
-						if (!Inv.placeStack(mc, menu, COAL, 1) && !Inv.placeStack(mc, menu, PLANKS, 1) && !Inv.placeStack(mc, menu, LOGS, 1)) {
+					hand.pause(6 + random.nextInt(6));
+					phase = 4;
+				}
+				case 4 -> {
+					if (!(menu instanceof AbstractFurnaceMenu furnace)) {
+						phase = 2;
+						return false;
+					}
+					// Take out what's done first
+					if (furnace.getSlot(2).hasItem()) {
+						hand.click(2, 0, ContainerInput.QUICK_MOVE);
+						return false;
+					}
+					if (Inv.count(player, output) >= target) {
+						phase = 7;
+						return false;
+					}
+					// What it still needs: something to smelt (slot 0) and something to burn (slot 1)
+					fills.clear();
+					boolean hasInput = furnace.getSlot(0).hasItem() || Inv.count(player, input) > 0;
+					if (!hasInput) {
+						close(mc);
+						end("failed", "smelting_stopped");
+						return true;
+					}
+					if (!furnace.getSlot(0).hasItem()) fills.add(new Inv.Fill(0, input, true));
+					if (!furnace.getSlot(1).hasItem() && !furnace.isLit()) {
+						Predicate<ItemStack> fuel = Inv.count(player, COAL) > 0 ? COAL : Inv.count(player, PLANKS) > 0 ? PLANKS : Inv.count(player, LOGS) > 0 ? LOGS : null;
+						if (fuel == null) {
+							close(mc);
 							end("failed", "no_fuel");
 							return true;
 						}
+						fills.add(new Inv.Fill(1, fuel, true));
 					}
-					event("step", name);
-					phase = 4;
-					wait = 0;
+					phase = 5;
 				}
-				case 4 -> {
-					AbstractContainerMenu menu = player.containerMenu;
-					if (!(menu instanceof AbstractFurnaceMenu)) {
-						phase = 2; // the player or the game closed it: open it again
-						return false;
+				case 5 -> {
+					Inv.Move move = Inv.nextFill(player, menu, fills);
+					if (move == Inv.DONE || move == Inv.MISSING) {
+						// It's burning: close it and keep an eye on it from outside
+						hand.pause(6 + random.nextInt(6));
+						phase = 6;
+						wait = 0;
+					} else {
+						hand.click(move.slot(), move.button(), ContainerInput.PICKUP);
 					}
-					if (menu.getSlot(2).hasItem() && (++wait % 10 == 0)) Inv.click(mc, menu, 2, 0, ContainerInput.QUICK_MOVE);
-					boolean done = Inv.count(player, output) >= target;
-					boolean stuck = !menu.getSlot(0).hasItem() && !menu.getSlot(2).hasItem() && !done;
-					if (done || stuck) {
-						if (menu.getSlot(0).hasItem()) Inv.click(mc, menu, 0, 0, ContainerInput.QUICK_MOVE);
-						if (menu.getSlot(1).hasItem()) Inv.click(mc, menu, 1, 0, ContainerInput.QUICK_MOVE);
-						player.closeContainer();
-						if (!done) {
-							end("failed", "smelting_stopped");
-							return true;
-						}
-						event("smelted", id(output));
-						return true;
-					}
-					if (++wait > 20 * 60 * 3) {
-						end("failed", "smelting_too_slow");
-						return true;
-					}
+				}
+				case 6 -> {
+					if (wait == 0) close(mc);
+					// An item takes 10 seconds: look again every 5
+					if (++wait >= 100) phase = 2;
 				}
 				default -> {
+					// Done: take the leftover fuel back too
+					if (menu instanceof AbstractFurnaceMenu furnace && furnace.getSlot(1).hasItem()) {
+						hand.click(1, 0, ContainerInput.QUICK_MOVE);
+						phase = 8;
+						return false;
+					}
+					close(mc);
+					event("smelted", id(output));
 					return true;
 				}
 			}
 			return false;
 		}
+
+		private void close(Minecraft mc) {
+			hand.reset();
+			if (mc.player.containerMenu != mc.player.inventoryMenu) mc.player.closeContainer();
+		}
 	}
 
 	// ---- Helpers ----
+
+	/** The height she strip-mines at for an ore, or null for things she can see from where she is */
+	static Integer legitLevel(Block[] blocks) {
+		for (Block b : blocks) {
+			if (b == Blocks.DIAMOND_ORE || b == Blocks.DEEPSLATE_DIAMOND_ORE) return -54;
+			if (b == Blocks.IRON_ORE || b == Blocks.DEEPSLATE_IRON_ORE) return 16;
+			if (b == Blocks.COAL_ORE || b == Blocks.DEEPSLATE_COAL_ORE) return 48;
+			if (BuiltInRegistries.BLOCK.getKey(b).getPath().endsWith("_ore")) return 16;
+		}
+		return null;
+	}
 
 	private static IBaritone baritone() {
 		return BaritoneAPI.getProvider().getPrimaryBaritone();
@@ -706,6 +920,10 @@ public final class TaskRunner {
 			s.addProperty("count", amount);
 			s.addProperty("step", step);
 			s.addProperty("seconds", (System.currentTimeMillis() - startedAt) / 1000);
+			if (current instanceof MineStep m && Minecraft.getInstance().player != null) {
+				s.addProperty("have", m.have(Minecraft.getInstance().player));
+				s.addProperty("need", m.need());
+			}
 		}
 		statusSnapshot = s.toString();
 	}
