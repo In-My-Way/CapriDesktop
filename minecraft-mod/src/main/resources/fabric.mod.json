@@ -1,0 +1,23 @@
+{
+	"schemaVersion": 1,
+	"id": "capricraft",
+	"version": "${version}",
+	"name": "Capri Craft",
+	"description": "Lets Capri (CapriDesktop) take over your player when you ask her: go get diamonds, and she makes the pickaxe she needs on the way.",
+	"authors": ["nunezValen"],
+	"contact": {
+		"sources": "https://github.com/nunezValen/CapriDesktop"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": ["com.nunezvalen.capricraft.CapriCraftClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"baritone": "*"
+	}
+}

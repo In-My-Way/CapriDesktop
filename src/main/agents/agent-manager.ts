@@ -18,6 +18,7 @@ import { ollamaService } from '../services/ollama-service'
 import { roamingManager } from '../roaming/roaming-manager'
 import { activeWindowService } from '../services/active-window-service'
 import { hasPendingResult, openPendingResult } from '../services/pending-result'
+import { capriCraftService } from '../services/minecraft/capri-craft-service'
 
 /** Dev Mode tasks shorter than this finish quietly instead of popping Capri up with the wake-up line */
 const DEV_WAKEUP_MIN_MS = 20000
@@ -46,6 +47,8 @@ export class AgentManager extends EventEmitter {
   constructor() {
     super()
     this.setupListeners(this.capriLocal)
+    // What she says about her progress while she plays Minecraft for the player
+    capriCraftService.setSpeaker((text) => this.setCompanionSpeech(text, Math.max(3500, text.length * 70), true))
     app.whenReady().then(() => {
       this.config.model = getLocalModel()
     })
