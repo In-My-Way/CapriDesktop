@@ -24,6 +24,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import com.mojang.blaze3d.platform.InputConstants;
 import baritone.api.Settings;
+import net.minecraft.client.gui.screens.PauseScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.world.entity.monster.Monster;
 import net.minecraft.world.phys.Vec3;
@@ -134,6 +135,9 @@ public final class TaskRunner {
 					end("fled", "low_health");
 					mc.schedule(mc::disconnectWithSavingScreen);
 				} else {
+					// A pause menu that opened on its own (the window lost focus) would freeze her; one the
+					// player opened on purpose stays
+					if (mc.gui.screen() instanceof PauseScreen && !mc.isWindowActive()) mc.gui.setScreen(null);
 					hand.tick(mc);
 					defend(mc, player);
 					if (!hand.busy()) run(mc);
@@ -186,11 +190,21 @@ public final class TaskRunner {
 		setting(s.freeLook, false);
 		setting(s.smoothLook, true);
 		setting(s.legitMine, false);
+		// She keeps playing while the player looks at another window
+		Minecraft mc = Minecraft.getInstance();
+		if (pauseOnLostFocusBefore == null) pauseOnLostFocusBefore = mc.options.pauseOnLostFocus;
+		mc.options.pauseOnLostFocus = false;
 	}
+
+	private Boolean pauseOnLostFocusBefore = null;
 
 	private void restoreSettings() {
 		savedSettings.forEach((s, v) -> s.value = v);
 		savedSettings.clear();
+		if (pauseOnLostFocusBefore != null) {
+			Minecraft.getInstance().options.pauseOnLostFocus = pauseOnLostFocusBefore;
+			pauseOnLostFocusBefore = null;
+		}
 	}
 
 	private void accept(Minecraft mc, JsonObject task) {

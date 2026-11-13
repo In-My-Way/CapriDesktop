@@ -34,6 +34,10 @@ public final class Hand {
 	private ContainerInput type = null;
 	private int afterClick = 0;
 
+	// The ring that spreads out from a click
+	private static final int RIPPLE_TICKS = 8;
+	private int ripple = 0;
+
 	/** True while she's still moving to, or just finished, a click: the task waits for her */
 	public boolean busy() {
 		return type != null || afterClick > 0;
@@ -60,6 +64,7 @@ public final class Hand {
 	}
 
 	public void tick(Minecraft mc) {
+		if (ripple > 0) ripple--;
 		if (type == null) {
 			if (afterClick > 0) afterClick--;
 			return;
@@ -104,6 +109,7 @@ public final class Hand {
 		Inv.click(mc, menu, slot, button, type);
 		type = null;
 		afterClick = 2 + random.nextInt(3);
+		ripple = RIPPLE_TICKS;
 	}
 
 	/** Drawn after the menu: her cursor, and what she's carrying */
@@ -119,23 +125,103 @@ public final class Hand {
 		g.nextStratum();
 		ItemStack carried = gui.getMenu().getCarried();
 		if (!carried.isEmpty()) g.item(carried, cx - 8, cy - 8);
-		drawArrow(g, cx, cy);
+		if (ripple > 0) drawRipple(g, cx, cy, RIPPLE_TICKS - ripple + partial);
+		drawLayer(g, cx, cy, GLOW, 0x4000F0FF);
+		drawLayer(g, cx, cy, EDGE, 0xFFFFFFFF);
+		drawLayer(g, cx, cy, ARROW, 0xFF00F0FF);
+		drawBadge(g, cx, cy);
 	}
 
-	/** A small arrow, pink with a dark edge, its tip at (x, y) */
-	private static void drawArrow(GuiGraphicsExtractor g, int x, int y) {
-		int edge = 0xFF1A0A14;
-		int fill = 0xFFFF6FB5;
-		for (int row = 0; row < 11; row++) {
-			int width = row < 8 ? row + 1 : 3;
-			int start = row < 8 ? 0 : row - 6;
-			g.fill(x + start - 1, y + row - 1, x + start + width + 1, y + row + 2, edge);
+	// Her cursor, the same one she uses on the desktop (ScannerView): a cyan neon arrow with a white
+	// edge and a glow. The shape is the SVG path M3 3 L10.07 19.97 L12.58 12.58 L19.97 10.07 Z,
+	// turned into pixels once.
+	private static final double SCALE = 0.75;
+	private static final int SIZE = 20;
+	private static final int PAD = 2; // room for the glow above and left of the tip
+	private static final boolean[][] ARROW = new boolean[SIZE][SIZE];
+	private static final boolean[][] EDGE;
+	private static final boolean[][] GLOW;
+
+	static {
+		double[][] path = {{3, 3}, {10.07, 19.97}, {12.58, 12.58}, {19.97, 10.07}};
+		for (int py = 0; py < SIZE; py++) {
+			for (int px = 0; px < SIZE; px++) {
+				ARROW[py][px] = inside(path, 3 + (px - PAD + 0.5) / SCALE, 3 + (py - PAD + 0.5) / SCALE);
+			}
 		}
-		for (int row = 0; row < 11; row++) {
-			int width = row < 8 ? row + 1 : 3;
-			int start = row < 8 ? 0 : row - 6;
-			g.fill(x + start, y + row, x + start + width, y + row + 1, fill);
+		EDGE = grow(ARROW, 1);
+		GLOW = grow(ARROW, 2);
+	}
+
+	private static boolean inside(double[][] poly, double x, double y) {
+		boolean in = false;
+		for (int i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+			if ((poly[i][1] > y) != (poly[j][1] > y)
+				&& x < (poly[j][0] - poly[i][0]) * (y - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0]) in = !in;
 		}
+		return in;
+	}
+
+	/** The shape made `by` pixels fatter on every side */
+	private static boolean[][] grow(boolean[][] shape, int by) {
+		boolean[][] out = new boolean[SIZE][SIZE];
+		for (int y = 0; y < SIZE; y++) {
+			for (int x = 0; x < SIZE; x++) {
+				if (!shape[y][x]) continue;
+				for (int dy = -by; dy <= by; dy++) {
+					for (int dx = -by; dx <= by; dx++) {
+						int nx = x + dx, ny = y + dy;
+						if (nx >= 0 && ny >= 0 && nx < SIZE && ny < SIZE && Math.abs(dx) + Math.abs(dy) <= by + 1) out[ny][nx] = true;
+					}
+				}
+			}
+		}
+		return out;
+	}
+
+	/** One color over every pixel of a shape, in runs along each row; the tip sits at (x, y) */
+	private static void drawLayer(GuiGraphicsExtractor g, int x, int y, boolean[][] shape, int color) {
+		for (int row = 0; row < SIZE; row++) {
+			int start = -1;
+			for (int col = 0; col <= SIZE; col++) {
+				boolean on = col < SIZE && shape[row][col];
+				if (on && start < 0) start = col;
+				if (!on && start >= 0) {
+					g.fill(x + start - PAD, y + row - PAD, x + col - PAD, y + row - PAD + 1, color);
+					start = -1;
+				}
+			}
+		}
+	}
+
+	/** The cyan ring that spreads out where she clicked */
+	private static void drawRipple(GuiGraphicsExtractor g, int x, int y, float t) {
+		double radius = 2 + t * 1.4;
+		int alpha = (int) (0xE0 * (1 - t / RIPPLE_TICKS));
+		if (alpha <= 0) return;
+		int color = (alpha << 24) | 0x22D3EE;
+		int points = 28;
+		for (int i = 0; i < points; i++) {
+			double a = i * Math.PI * 2 / points;
+			int px = x + (int) Math.round(Math.cos(a) * radius);
+			int py = y + (int) Math.round(Math.sin(a) * radius);
+			g.fill(px, py, px + 1, py + 1, color);
+		}
+	}
+
+	/** The little "CAPRI ⚡" tag next to the arrow, gently pulsing */
+	private static void drawBadge(GuiGraphicsExtractor g, int x, int y) {
+		var font = Minecraft.getInstance().font;
+		String label = "CAPRI ⚡";
+		int bx = x + 13, by = y - 5;
+		int w = 8 + font.width(label) + 3;
+		int h = 11;
+		double pulse = 0.65 + 0.35 * Math.sin(System.currentTimeMillis() / 300.0);
+		int border = ((int) (0xCC * pulse) << 24) | 0x22D3EE;
+		g.fill(bx - 1, by - 1, bx + w + 1, by + h + 1, border);
+		g.fill(bx, by, bx + w, by + h, 0xF2090B14);
+		g.fill(bx + 3, by + 4, bx + 6, by + 7, 0xFF22D3EE);
+		g.text(font, label, bx + 8, by + 2, 0xFF67E8F9, false);
 	}
 
 	private static double ease(double t) {
