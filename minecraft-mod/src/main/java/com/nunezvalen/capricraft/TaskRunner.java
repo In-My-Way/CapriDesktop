@@ -133,7 +133,7 @@ public final class TaskRunner {
 				} else if (player.getHealth() <= 4f) {
 					// Two hearts left: out to the title screen before she loses the player's things
 					end("fled", "low_health");
-					mc.schedule(mc::disconnectWithSavingScreen);
+					mc.schedule(() -> exitToTitle(mc));
 				} else {
 					// A pause menu that opened on its own (the window lost focus) would freeze her; one the
 					// player opened on purpose stays
@@ -148,6 +148,13 @@ public final class TaskRunner {
 			}
 		}
 		snapshot();
+	}
+
+	/** Save and quit to the title screen, the same three steps the game's own death screen takes */
+	private static void exitToTitle(Minecraft mc) {
+		if (mc.level != null) mc.level.disconnect(net.minecraft.client.multiplayer.ClientLevel.DEFAULT_QUIT_MESSAGE);
+		mc.disconnectWithSavingScreen();
+		mc.gui.setScreen(new net.minecraft.client.gui.screens.TitleScreen());
 	}
 
 	/** A monster in arm's reach gets hit, when no menu is open and her arm is ready */
