@@ -52,6 +52,7 @@ await build({
   entryPoints:['tests/capri-craft.test.ts'],outfile:'work/capri-craft-tests.cjs',bundle:true,platform:'node',format:'cjs',
   plugins:[{name:'capri-craft-mocks',setup(b){
     b.onResolve({filter:/consciousness-service$/},()=>({path:mock('agent-lifecycle-mocks.ts')}))
+    b.onResolve({filter:/llm-gateway$/},()=>({path:mock('llm-gateway-mock.ts')}))
   }}]
 })
 execFileSync(process.execPath,['--test','work/capri-craft-tests.cjs'],{stdio:'inherit'})

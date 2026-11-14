@@ -1,4 +1,5 @@
 import { consciousnessService } from '../consciousness-service'
+import { getLocalModel, llmFetch } from '../llm-gateway'
 
 /**
  * Capri Craft: she plays Minecraft as the player. The Capri Craft mod (minecraft-mod/) runs inside
@@ -12,11 +13,12 @@ export type CraftTask =
   | { action: 'get'; item: string; count: number }
   | { action: 'mine'; block: string; count: number }
   | { action: 'goto'; x: number; y?: number; z: number }
+  | { action: 'nether' }
   | { action: 'stop' }
 
 interface CraftEvent {
   id: number
-  kind: 'started' | 'step' | 'got' | 'placed' | 'crafted' | 'smelted' | 'done' | 'failed' | 'stopped' | 'fled'
+  kind: 'started' | 'step' | 'got' | 'placed' | 'crafted' | 'smelted' | 'done' | 'failed' | 'stopped' | 'fled' | 'fight' | 'ate' | 'wore' | 'arrived'
   detail: string
 }
 
@@ -34,10 +36,22 @@ interface CraftStatus {
 
 // What she understands, the specific things before the general ones ("pico de hierro" before "hierro")
 const ITEMS: { re: RegExp; item: string; plural?: RegExp; many: number }[] = [
+  { re: /pico de diamante|diamond pick(?:axe)?/i, item: 'diamond_pickaxe', many: 1 },
   { re: /pico de hierro|iron pick(?:axe)?/i, item: 'iron_pickaxe', many: 1 },
   { re: /pico de piedra|stone pick(?:axe)?/i, item: 'stone_pickaxe', many: 1 },
   { re: /pico de madera|wood(?:en)? pick(?:axe)?/i, item: 'wooden_pickaxe', many: 1 },
   { re: /\bpico\b|pickaxe/i, item: 'wooden_pickaxe', many: 1 },
+  { re: /espada de hierro|iron sword/i, item: 'iron_sword', many: 1 },
+  { re: /\bespada\b|\bsword\b/i, item: 'stone_sword', many: 1 },
+  { re: /\bcasco\b|helmet/i, item: 'iron_helmet', many: 1 },
+  { re: /pechera|peto|chestplate/i, item: 'iron_chestplate', many: 1 },
+  { re: /pantal[oó]n|pantalones|grebas|leggings/i, item: 'iron_leggings', many: 1 },
+  { re: /\bbotas\b|\bboots\b/i, item: 'iron_boots', many: 1 },
+  { re: /armadura|\barmor\b|\barmour\b/i, item: 'iron_armor', many: 1 },
+  { re: /encendedor|mechero|flint and steel|yesquero/i, item: 'flint_and_steel', many: 1 },
+  { re: /pedernal|\bflint\b/i, item: 'flint', many: 1 },
+  { re: /obsidiana|obsidian/i, item: 'obsidian', many: 10 },
+  { re: /comida|\bcomer\b|algo de comer|\bfood\b|something to eat|carne|\bmeat\b/i, item: 'food', many: 4 },
   { re: /mesa de (?:crafteo|trabajo|crafting)|crafting table|workbench/i, item: 'crafting_table', many: 1 },
   { re: /\bhorno\b|furnace/i, item: 'furnace', many: 1 },
   { re: /diamante|diamond/i, item: 'diamond', plural: /diamantes|diamonds/i, many: 3 },
@@ -62,6 +76,8 @@ const GET_VERB =
 const STOP_VERB =
   /^(?:capri[\s,]*)?(?:par[aá]|det[eé]nte|stop|basta|fren[aá]|cancel[aá])(?!\p{L})|dej[aá] de jugar|solt[aá] el control|devolv[eé]me el control|give me (?:back )?(?:the )?control|stop playing/iu
 const MINECRAFT = /\bminecraft\b|\bmaincra\b/i
+const NETHER = /\bnether\b|\binfierno\b/i
+const GO_VERB = /(?<!\p{L})(?:and[aá]|ve|vamos|llev[aá]me|llevame|entr[aá]|entremos|viaj[aá]|go|take me|let'?s go|enter|travel)(?!\p{L})/iu
 
 /** What was asked, or null when it isn't something for Minecraft */
 export function parseCraftCommand(text: string, taskRunning = false): CraftTask | null {
@@ -75,6 +91,8 @@ export function parseCraftCommand(text: string, taskRunning = false): CraftTask 
     const [x, a, b] = [Number(coords[1]), Number(coords[2]), coords[3] !== undefined ? Number(coords[3]) : undefined]
     return b === undefined ? { action: 'goto', x, z: a } : { action: 'goto', x, y: a, z: b }
   }
+
+  if (NETHER.test(t) && (GO_VERB.test(t) || GET_VERB.test(t) || mentionsGame)) return { action: 'nether' }
 
   if (!GET_VERB.test(t) && !mentionsGame) return null
   const found = ITEMS.find((i) => i.re.test(t))
@@ -124,7 +142,67 @@ const ITEM_NAMES: Record<string, [string, string]> = {
   stone_pickaxe: ['un pico de piedra', 'a stone pickaxe'],
   wooden_pickaxe: ['un pico de madera', 'a wooden pickaxe'],
   crafting_table: ['una mesa de crafteo', 'a crafting table'],
-  furnace: ['un horno', 'a furnace']
+  furnace: ['un horno', 'a furnace'],
+  diamond_pickaxe: ['un pico de diamante', 'a diamond pickaxe'],
+  stone_sword: ['una espada', 'a sword'],
+  iron_sword: ['una espada de hierro', 'an iron sword'],
+  iron_armor: ['una armadura de hierro completa', 'a full set of iron armor'],
+  iron_helmet: ['un casco de hierro', 'an iron helmet'],
+  iron_chestplate: ['una pechera de hierro', 'an iron chestplate'],
+  iron_leggings: ['unos pantalones de hierro', 'iron leggings'],
+  iron_boots: ['unas botas de hierro', 'iron boots'],
+  food: ['comida', 'food'],
+  flint: ['pedernal', 'flint'],
+  flint_and_steel: ['un encendedor', 'a flint and steel'],
+  obsidian: ['obsidiana', 'obsidian']
+}
+
+// What the model may answer with when it reads a free request
+const MODEL_ITEMS = [
+  'diamond', 'iron_ingot', 'raw_iron', 'coal', 'log', 'planks', 'stick', 'cobblestone', 'crafting_table', 'furnace',
+  'wooden_pickaxe', 'stone_pickaxe', 'iron_pickaxe', 'diamond_pickaxe', 'stone_sword', 'iron_sword', 'iron_armor',
+  'iron_helmet', 'iron_chestplate', 'iron_leggings', 'iron_boots', 'food', 'flint', 'flint_and_steel', 'obsidian'
+]
+
+const MODEL_ALIASES: Record<string, string> = {
+  cooked_meat: 'food', meat: 'food', steak: 'food', cooked_beef: 'food', cooked_porkchop: 'food', bread: 'food', apple: 'food', apples: 'food',
+  iron: 'iron_ingot', iron_ingots: 'iron_ingot', diamonds: 'diamond', wood: 'log', logs: 'log', oak_log: 'log', stone: 'cobblestone',
+  sticks: 'stick', plank: 'planks', oak_planks: 'planks', sword: 'stone_sword', pickaxe: 'stone_pickaxe', armor: 'iron_armor',
+  lighter: 'flint_and_steel', table: 'crafting_table', workbench: 'crafting_table', wool: 'white_wool'
+}
+
+// Worth asking the model about: short, and sounds like asking her to do something
+const REQUEST_HINT =
+  /(?<!\p{L})(?:and[aá]|ve|vamos|tra[eé]|busc[aá]|hac[eé]|hacete|constru[ií]|mat[aá]|consegu[ií]|junt[aá]|prepar[aá]|equip[aá]te|pon[eé]te|com[eé]|caz[aá]|llev[aá]me|minecraft|jug[aá]|go|get|make|build|kill|find|bring|craft|collect|hunt|eat|put on|take me|play)(?!\p{L})/iu
+
+export type ModelReading = CraftTask | { action: 'unsupported'; what: string } | null
+
+/** Checks what the model answered: only things the mod can actually do get through */
+export function readModelAnswer(raw: string): ModelReading {
+  let data: any
+  try {
+    data = JSON.parse(raw.replace(/^[^{]*/, '').replace(/[^}]*$/, ''))
+  } catch {
+    return null
+  }
+  const action = String(data?.action || '')
+  const count = Math.max(1, Math.min(Number(data?.count) || 1, 640))
+  if (action === 'get' || action === 'mine') {
+    // Small models make names up: "cooked meat", "minecraft:sand", "iron". Bring them back to what the mod knows
+    const raw = String(data.item || data.block || '').toLowerCase().replace(/^minecraft:/, '').trim().replace(/[\s-]+/g, '_')
+    const name = MODEL_ALIASES[raw] || raw
+    if (MODEL_ITEMS.includes(name)) return { action: 'get', item: name, count }
+    // Anything else that looks like a block id gets dug up
+    if (/^[a-z_]{3,40}$/.test(name)) return { action: 'mine', block: name, count }
+    return null
+  }
+  if (action === 'goto' && Number.isFinite(data.x) && Number.isFinite(data.z)) {
+    return Number.isFinite(data.y) ? { action: 'goto', x: Math.round(data.x), y: Math.round(data.y), z: Math.round(data.z) } : { action: 'goto', x: Math.round(data.x), z: Math.round(data.z) }
+  }
+  if (action === 'nether') return { action: 'nether' }
+  if (action === 'stop') return { action: 'stop' }
+  if (action === 'unsupported') return { action: 'unsupported', what: String(data.what || '').slice(0, 80) }
+  return null
 }
 
 class CapriCraftService {
@@ -136,6 +214,30 @@ class CapriCraftService {
   /** How she says things while a task runs (set once by the agent manager) */
   public setSpeaker(fn: (text: string) => void): void {
     this.speak = fn
+    this.watchForGame()
+  }
+
+  private gameWatch: NodeJS.Timeout | null = null
+  private warmedAt = 0
+
+  /**
+   * While the player is in a world, keeps her model loaded: a cold load takes ~20-40s, and a free
+   * request ("preparate para pelear") shouldn't wait that long. A loopback ping every 20s costs nothing.
+   */
+  private watchForGame(): void {
+    if (this.gameWatch) return
+    this.gameWatch = setInterval(async () => {
+      if (Date.now() - this.warmedAt < 20 * 60 * 1000) return
+      const ping = await this.ping()
+      if (!ping?.inWorld) return
+      this.warmedAt = Date.now()
+      llmFetch('http://127.0.0.1:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: getLocalModel(), prompt: '', keep_alive: '30m' })
+      }).catch(() => {})
+    }, 20000)
+    this.gameWatch.unref?.()
   }
 
   private get es(): boolean {
@@ -152,9 +254,18 @@ class CapriCraftService {
    * brain gets it.
    */
   public async handleCommand(text: string): Promise<{ handled: boolean; reply?: string }> {
-    const task = parseCraftCommand(text, this.running)
-    if (!task) return { handled: false }
+    let task = parseCraftCommand(text, this.running)
     const mentionsGame = MINECRAFT.test(text)
+    if (!task) {
+      // Not one of the phrases she knows: if she's in a world and it sounds like a request, the model reads it
+      if (text.trim().split(/\s+/).length > 30 || !(REQUEST_HINT.test(text) || this.running)) return { handled: false }
+      const ping = await this.ping()
+      if (!ping?.inWorld) return { handled: false }
+      const reading = await this.askModel(text)
+      if (!reading) return { handled: false }
+      if (reading.action === 'unsupported') return { handled: true, reply: this.unsupportedLine(reading.what) }
+      task = reading
+    }
 
     const ping = await this.ping()
     // "Buscame diamantes" with no game open is about something else
@@ -193,8 +304,70 @@ class CapriCraftService {
     return { handled: true, reply: this.acceptLine(task) }
   }
 
+  /** The model turns a free request into one task, "unsupported", or nothing (it wasn't for Minecraft) */
+  private async askModel(text: string): Promise<ModelReading> {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 20000)
+    try {
+      const res = await llmFetch('http://127.0.0.1:11434/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          model: getLocalModel(),
+          stream: false,
+          format: 'json',
+          keep_alive: '30m',
+          options: { temperature: 0, num_predict: 80, quick: true },
+          messages: [
+            {
+              role: 'system',
+              content:
+                'The player is in Minecraft and you control their character. Turn what they say into ONE JSON task you can do, and nothing else.\n' +
+                `{"action":"get","item":ITEM,"count":N} where ITEM is one of: ${MODEL_ITEMS.join(', ')} ("food" = cooked meat; "log" = wood)\n` +
+                '{"action":"mine","block":"<minecraft block id, like sand or oak_log>","count":N} to dig up any other block\n' +
+                '{"action":"goto","x":X,"y":Y,"z":Z} to walk to coordinates (y optional)\n' +
+                '{"action":"nether"} to build a portal and go to the Nether\n' +
+                '{"action":"stop"} to stop playing and give control back\n' +
+                '{"action":"unsupported","what":"<short description>"} for a Minecraft request outside that list (building, farming, fighting a boss, the End...)\n' +
+                '{"action":"none"} when it is not a request to do something in Minecraft (a question, small talk).\n' +
+                'Examples: "preparate para pelear" -> {"action":"get","item":"iron_sword","count":1}; "tengo hambre" -> {"action":"get","item":"food","count":4}; ' +
+                '"traeme 20 de arena" -> {"action":"mine","block":"sand","count":20}; "construime una casa" -> {"action":"unsupported","what":"construir una casa"}; ' +
+                '"matá al dragón" -> {"action":"unsupported","what":"matar al Ender Dragon (está en el End)"}; "qué hora es" -> {"action":"none"}. ' +
+                'Use get only when ITEM is exactly the thing they asked for. Plain blocks like dirt (tierra), sand (arena), gravel, clay or wool are mine with that block id. ' +
+                'Farming, building, taming, enchanting, brewing, trading, diamond or netherite armor and tools other than the diamond pickaxe, buckets, beds, the End: unsupported. ' +
+                'Never turn a request you cannot do into a different task: use unsupported.'
+            },
+            { role: 'user', content: text }
+          ]
+        })
+      })
+      if (!res.ok) return null
+      const data = (await res.json()) as { message?: { content?: string } }
+      const reading = readModelAnswer(data.message?.content || '')
+      console.log(`[CapriCraft] The model read "${text}" as ${JSON.stringify(reading)}`)
+      return reading
+    } catch (err: any) {
+      console.warn('[CapriCraft] The model could not read the request:', err?.message || err)
+      return null
+    } finally {
+      clearTimeout(timer)
+    }
+  }
+
+  private unsupportedLine(what: string): string {
+    return this.es
+      ? `[thoughtful] Eso${what ? ` (${what})` : ''} todavía no lo sé hacer. Puedo conseguirte materiales, picos, espada, armadura, comida, ir a unas coordenadas o llevarte al Nether.`
+      : `[thoughtful] I can't do that${what ? ` (${what})` : ''} yet. I can get you materials, pickaxes, a sword, armor, food, walk to coordinates or take you to the Nether.`
+  }
+
   private acceptLine(task: CraftTask): string {
     const es = this.es
+    if (task.action === 'nether') {
+      return es
+        ? '[excited] ¡Nos vamos al Nether! Necesito un pico de diamante, un encendedor y diez de obsidiana para el portal. Lo que me falte lo consigo en el camino. Puede tardar un buen rato. Apretá K si querés el control de vuelta.'
+        : "[excited] We're going to the Nether! I need a diamond pickaxe, a flint and steel and ten obsidian for the portal; whatever I'm missing I'll get on the way. It may take a while. Press K if you want control back."
+    }
     if (task.action === 'goto') {
       return es ? `[excited] Voy para ${task.x}, ${task.z}. Apretá K si querés el control de vuelta.` : `[excited] Heading to ${task.x}, ${task.z}. Press K if you want control back.`
     }
@@ -315,8 +488,23 @@ class CapriCraftService {
         if (d.endsWith('furnace')) return es ? '[happy] Horno armado.' : '[happy] Furnace built.'
         return null
       case 'smelted':
+        if (d === 'food') return es ? '[happy] Comida lista, bien cocinada.' : '[happy] Food is ready, nicely cooked.'
         return es ? '[happy] Listo, hierro fundido.' : '[happy] Done, the iron is smelted.'
+      case 'fight':
+        return es
+          ? this.pick([`[surprised] ¡Un ${this.mobName(d)}! Me defiendo.`, `[surprised] Uy, ${this.mobName(d)}. Dame un segundo que me lo saco de encima.`])
+          : this.pick([`[surprised] A ${d.replace(/_/g, ' ')}! Fighting back.`, `[surprised] Ugh, a ${d.replace(/_/g, ' ')}. Give me a second.`])
+      case 'ate':
+        return es ? this.pick(['[happy] Comí algo, ya estoy mejor.', '[happy] Ñam. Con hambre no se puede minar.']) : this.pick(['[happy] Ate something, feeling better.', "[happy] Yum. Can't mine on an empty stomach."])
+      case 'wore':
+        return es ? '[proud] Me la puse.' : '[proud] Put it on.'
+      case 'arrived':
+        return es ? '[excited] ¡Llegamos al Nether! Cuidado con la lava.' : '[excited] We made it to the Nether! Watch out for the lava.'
+      case 'placed':
+        if (d === 'portal lit') return es ? '[excited] ¡Se prendió el portal!' : '[excited] The portal is lit!'
+        return null
       case 'done':
+        if (d.startsWith('nether')) return es ? '[happy] Listo, estamos en el Nether. Te devuelvo el control.' : "[happy] There, we're in the Nether. Control is yours again."
         return es ? '[excited] ¡Listo! Ya tenés lo que me pediste. Te devuelvo el control.' : '[excited] Done! You have what you asked for. Control is yours again.'
       case 'stopped':
         if (d === 'replaced') return null
@@ -363,6 +551,11 @@ class CapriCraftService {
         return es
           ? `[excited] Ahora a buscar hierro${forEs}. Voy a cavar hacia abajo, sin trampa: solo lo que vea.`
           : `[excited] Now to find iron${forEn}. I'll dig down and look, no cheating: only what I can see.`
+      case 'craft iron chestplate':
+      case 'craft iron leggings':
+      case 'craft iron helmet':
+      case 'craft iron boots':
+        return es ? `[happy] Me hago ${this.armorName(step)}.` : `[happy] Making the iron ${step.replace('craft iron ', '')}.`
       case 'craft furnace':
         return es ? '[happy] Necesito un horno para fundir el hierro.' : '[happy] I need a furnace to smelt the iron.'
       case 'place furnace':
@@ -371,6 +564,26 @@ class CapriCraftService {
         return es ? '[happy] A fundir el hierro. Tarda unos segundos por lingote.' : '[happy] Smelting the iron. It takes a few seconds per ingot.'
       case 'craft iron pickaxe':
         return es ? '[excited] ¡Ahora el pico de hierro!' : '[excited] Now the iron pickaxe!'
+      case 'craft diamond pickaxe':
+        return es ? '[excited] ¡Pico de diamante! El mejor que hay.' : '[excited] A diamond pickaxe! The best there is.'
+      case 'craft stone sword':
+        return es ? '[happy] Me hago una espada, por las dudas. Abajo hay bichos.' : "[happy] Making a sword, just in case. There are monsters down there."
+      case 'craft iron sword':
+        return es ? '[happy] Una espada de hierro, para pelear en serio.' : '[happy] An iron sword, for a real fight.'
+      case 'hunt':
+        return es ? '[happy] Me voy a cazar algo para comer.' : '[happy] Going to hunt something to eat.'
+      case 'cook food':
+        return es ? '[happy] La cocino en el horno, cruda no.' : '[happy] Cooking it in the furnace, not eating it raw.'
+      case 'dig gravel':
+        return es ? '[happy] Cavo grava hasta que salga un pedernal.' : '[happy] Digging gravel until some flint drops.'
+      case 'craft flint and steel':
+        return es ? '[happy] Con el pedernal y un hierro me hago un encendedor.' : '[happy] Flint and iron make a flint and steel.'
+      case 'mine obsidian':
+        return es ? '[excited] Ahora obsidiana para el portal. Es durísima, cada bloque tarda.' : '[excited] Now obsidian for the portal. It is tough, every block takes a while.'
+      case 'build portal':
+        return es ? '[excited] Armo el portal: cuatro de ancho y cinco de alto.' : '[excited] Building the portal: four wide, five tall.'
+      case 'enter portal':
+        return es ? '[excited] ¡Adentro! Agarrate.' : '[excited] In we go! Hold on.'
       case 'mine diamonds':
         return es
           ? '[excited] ¡Ahora sí, a buscar diamantes! Bajo bien hondo y cavo un túnel hasta verlos. Puede tardar un rato.'
@@ -380,6 +593,22 @@ class CapriCraftService {
       default:
         return null
     }
+  }
+
+  private mobName(id: string): string {
+    const names: Record<string, string> = {
+      zombie: 'zombie', skeleton: 'esqueleto', creeper: 'creeper', spider: 'araña', cave_spider: 'araña de cueva',
+      drowned: 'ahogado', husk: 'zombie del desierto', stray: 'esqueleto helado', witch: 'bruja', slime: 'slime',
+      enderman: 'enderman', piglin: 'piglin', zombified_piglin: 'piglin zombi', blaze: 'blaze', magma_cube: 'cubo de magma'
+    }
+    return names[id] || id.replace(/_/g, ' ')
+  }
+
+  private armorName(step: string): string {
+    if (step.endsWith('chestplate')) return 'la pechera de hierro'
+    if (step.endsWith('leggings')) return 'los pantalones de hierro'
+    if (step.endsWith('helmet')) return 'el casco de hierro'
+    return 'las botas de hierro'
   }
 
   /** How a long search is going */
@@ -413,6 +642,10 @@ class CapriCraftService {
         : "[sad] I can't find any more of what I need around here. Take me somewhere else and ask again."
     }
     if (reason.startsWith('no_room_for')) return es ? '[sad] No tengo lugar para poner la mesa o el horno acá.' : "[sad] There's no room here to put down the table or the furnace."
+    if (reason === 'player_dead') return es ? '[curious] Estás muerto en el juego. Tocá Reaparecer y pedímelo de nuevo.' : "[curious] You're dead in the game. Hit Respawn and ask me again."
+    if (reason === 'no_room_for:portal') return es ? '[sad] No encuentro un lugar plano para armar el portal. Llevame a un lugar más abierto.' : "[sad] I can't find a flat spot for the portal. Take me somewhere more open."
+    if (reason === 'portal_did_not_light') return es ? '[sad] El portal no se prendió. Fijate si el marco quedó bien.' : "[sad] The portal didn't light. Check the frame."
+    if (reason === 'could_not_find:hunt') return es ? '[sad] No veo animales por acá para cazar. Llevame a otro lado.' : "[sad] I don't see any animals around to hunt. Take me somewhere else."
     if (reason === 'died') return es ? '[sad] Me mataron... Perdón. Te devuelvo el control.' : '[sad] I got killed... Sorry. Control is yours again.'
     if (reason === 'not_in_world') return es ? '[sad] Saliste del mundo, así que paré.' : '[sad] You left the world, so I stopped.'
     if (reason.startsWith('unknown')) return es ? '[curious] No sé qué es eso en Minecraft.' : "[curious] I don't know what that is in Minecraft."
