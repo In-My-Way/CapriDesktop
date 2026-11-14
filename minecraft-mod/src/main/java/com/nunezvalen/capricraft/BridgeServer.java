@@ -110,6 +110,23 @@ public final class BridgeServer implements Runnable {
 				}
 				runner.submit(task);
 				respond(socket, 202, "{\"ok\":true}");
+			} else if (method.equals("POST") && path.equals("/dev/command") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
+				// Only in the development client (gradlew runClient): a chat command, to set up a test
+				String command = bodyText.trim();
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				mc.execute(() -> {
+					if (mc.player != null) mc.player.connection.sendCommand(command.startsWith("/") ? command.substring(1) : command);
+				});
+				respond(socket, 202, "{\"ok\":true}");
+			} else if (method.equals("POST") && path.equals("/dev/respawn") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				mc.execute(() -> {
+					if (mc.player != null && mc.player.isDeadOrDying()) {
+						mc.player.respawn();
+						mc.gui.setScreen(null);
+					}
+				});
+				respond(socket, 202, "{\"ok\":true}");
 			} else {
 				respond(socket, 404, "{\"ok\":false,\"error\":\"not_found\"}");
 			}

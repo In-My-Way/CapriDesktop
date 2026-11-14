@@ -19,9 +19,20 @@ The mod listens on `127.0.0.1:25599` (loopback only, browser requests are refuse
 | `GET /status?since=N` | current task, its step, and the events after id N |
 | `POST /task` | `{"action":"get","item":"diamond","count":3}`, `{"action":"mine","block":"oak_log","count":10}`, `{"action":"goto","x":0,"y":64,"z":0}`, `{"action":"stop"}` |
 
-Items `get` understands: `diamond`, `iron_ingot`, `raw_iron`, `coal`, `iron_pickaxe`,
-`stone_pickaxe`, `wooden_pickaxe`, `crafting_table`, `furnace`, `stick`, `planks`, `log`,
-`cobblestone`, or any block id (it is mined).
+Things `get` understands: `diamond`, `iron_ingot`, `raw_iron`, `coal`, `log`, `planks`, `stick`,
+`cobblestone`, `crafting_table`, `furnace`, the `wooden_`, `stone_`, `iron_` and `diamond_pickaxe`,
+`stone_sword`, `iron_sword`, `iron_armor` (or one piece: `iron_helmet`, `iron_chestplate`,
+`iron_leggings`, `iron_boots`, which she also puts on), `food` (she hunts and cooks), `flint`,
+`flint_and_steel`, `obsidian`, or any block id (it is mined). `{"action":"nether"}` gets whatever a
+portal needs, builds it, lights it and walks in.
+
+While she plays she eats when she's hungry, fights monsters that come for her, and leaves to the
+title screen at two hearts. She mines ores only once she has seen them, and crafts with a cursor of
+her own that moves at a person's pace.
+
+In the development client (`gradlew runClient`) there are two more routes for setting up tests:
+`POST /dev/command` (a chat command, like `give @s minecraft:obsidian 10`) and `POST /dev/respawn`.
+They don't exist in a normal install.
 
 ## Build
 

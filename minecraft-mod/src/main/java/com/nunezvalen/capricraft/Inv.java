@@ -178,6 +178,58 @@ public final class Inv {
 	}
 
 	/** 0 wooden or golden, 1 stone, 2 iron, 3 diamond, 4 netherite; -1 none */
+	public static int bestSword(LocalPlayer player) {
+		int best = -1;
+		for (int i = 0; i < MAIN_SLOTS; i++) {
+			Item item = player.getInventory().getItem(i).getItem();
+			int tier = item == Items.NETHERITE_SWORD ? 4
+				: item == Items.DIAMOND_SWORD ? 3
+				: item == Items.IRON_SWORD ? 2
+				: item == Items.STONE_SWORD ? 1
+				: (item == Items.WOODEN_SWORD || item == Items.GOLDEN_SWORD) ? 0
+				: -1;
+			best = Math.max(best, tier);
+		}
+		return best;
+	}
+
+	public static boolean isSword(ItemStack s) {
+		return s.is(Items.NETHERITE_SWORD) || s.is(Items.DIAMOND_SWORD) || s.is(Items.IRON_SWORD) || s.is(Items.STONE_SWORD) || s.is(Items.WOODEN_SWORD) || s.is(Items.GOLDEN_SWORD);
+	}
+
+	/** Her best sword in hand; false if she has none */
+	public static boolean holdBestSword(Minecraft mc) {
+		int tier = bestSword(mc.player);
+		if (tier < 0) return false;
+		Item want = tier == 4 ? Items.NETHERITE_SWORD : tier == 3 ? Items.DIAMOND_SWORD : tier == 2 ? Items.IRON_SWORD : tier == 1 ? Items.STONE_SWORD : null;
+		if (mc.player.getMainHandItem().is(want != null ? want : Items.WOODEN_SWORD)) return true;
+		return hold(mc, want != null ? s -> s.is(want) : Inv::isSword);
+	}
+
+	/** Food that's safe to eat: no raw chicken, rotten flesh, spider eyes or anything that poisons */
+	public static boolean edible(ItemStack s) {
+		if (s.isEmpty() || s.get(net.minecraft.core.component.DataComponents.FOOD) == null) return false;
+		return !(s.is(Items.ROTTEN_FLESH) || s.is(Items.SPIDER_EYE) || s.is(Items.POISONOUS_POTATO) || s.is(Items.PUFFERFISH)
+			|| s.is(Items.CHICKEN) || s.is(Items.SUSPICIOUS_STEW) || s.is(Items.CHORUS_FRUIT)
+			|| s.is(Items.GOLDEN_APPLE) || s.is(Items.ENCHANTED_GOLDEN_APPLE));
+	}
+
+	/** Where she clicks to put a block against `support`'s `face`: the middle of that face */
+	public static Vec3 faceCenter(BlockPos support, Direction face) {
+		return Vec3.atCenterOf(support).add(face.getStepX() * 0.5, face.getStepY() * 0.5, face.getStepZ() * 0.5);
+	}
+
+	/** Places the held block against a face of `support`: it lands at support.relative(face) */
+	public static void placeAgainst(Minecraft mc, BlockPos support, Direction face) {
+		mc.gameMode.useItemOn(mc.player, InteractionHand.MAIN_HAND, new BlockHitResult(faceCenter(support, face), face, support, false));
+	}
+
+	/** Swings like the game does on an attack */
+	public static void swing(LocalPlayer player) {
+		player.swing(InteractionHand.MAIN_HAND, player.getMainHandItem().getAttackAnimation(), false);
+	}
+
+	/** 0 wooden or golden, 1 stone, 2 iron, 3 diamond, 4 netherite; -1 none */
 	public static int bestPickaxe(LocalPlayer player) {
 		int best = -1;
 		for (int i = 0; i < MAIN_SLOTS; i++) {
