@@ -2751,8 +2751,8 @@ LANGUAGE RULE: ${langDirective}`
       return
     }
 
-    // Casual chat / conversation & canon lore handler
-    const fastLore = this.resolveFastLoreResponse(p, isSpanish)
+    // Casual chat / conversation & canon lore handler. Not when her brain failed: it would look like an answer
+    const fastLore = brainProblem ? null : this.resolveFastLoreResponse(p, isSpanish)
     if (fastLore) {
       this.emitAssistant(fastLore)
       this.finishSession()
