@@ -118,7 +118,8 @@ export function parseCompanionOrder(text: string): CompanionOrder | null {
     }
   }
 
-  const craft = parseCraftCommand(t, true)
+  // "Dame 10 de piedra" asks for it like "traeme": she gets what she's missing and hands it over
+  const craft = parseCraftCommand(t, true) ?? (GIVE.test(t) ? parseCraftCommand(t.replace(GIVE, 'traeme'), true) : null)
   if (craft?.action === 'goto') return craft
   if (craft?.action === 'get') {
     // "Dame un pico" when she might already carry one: get it (she skips what she has) and hand it over

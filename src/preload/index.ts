@@ -268,6 +268,14 @@ const api = {
       }
     },
 
+    onPortal: (callback: (direction: 'out' | 'in') => void): (() => void) => {
+      const subscription = (_event: IpcRendererEvent, direction: 'out' | 'in'): void => callback(direction)
+      ipcRenderer.on(IPC_CHANNELS.COMPANION_PORTAL, subscription)
+      return (): void => {
+        ipcRenderer.removeListener(IPC_CHANNELS.COMPANION_PORTAL, subscription)
+      }
+    },
+
     onLanguageChanged: (callback: (lang: string) => void): (() => void) => {
       const subscription = (_event: IpcRendererEvent, lang: string): void => callback(lang)
       ipcRenderer.on(IPC_CHANNELS.COMPANION_LANGUAGE_CHANGED, subscription)

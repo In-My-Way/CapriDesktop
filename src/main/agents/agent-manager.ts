@@ -54,7 +54,8 @@ export class AgentManager extends EventEmitter {
     // Her body in your Minecraft world: what she narrates, and what you type in the game's chat goes to her like anything you say
     companionService.setup(
       (text) => this.setCompanionSpeech(text, Math.max(3500, text.length * 70), true),
-      (text) => void this.sendPrompt(text, os.homedir(), undefined, 'pet').catch((err) => console.warn('[AgentManager] Minecraft chat prompt failed:', err))
+      (text) => void this.sendPrompt(text, os.homedir(), undefined, 'pet').catch((err) => console.warn('[AgentManager] Minecraft chat prompt failed:', err)),
+      (inWorld) => windowManager.setInMinecraft(inWorld)
     )
     app.whenReady().then(() => {
       this.config.model = getLocalModel()

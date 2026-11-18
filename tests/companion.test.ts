@@ -28,6 +28,9 @@ test('getting things, for the player or for herself', () => {
   assert.deepEqual(parseCompanionOrder('hacete una espada de hierro'), { action: 'get', item: 'iron_sword', count: 1, give: false })
   assert.deepEqual(parseCompanionOrder('juntame madera'), { action: 'get', item: 'log', count: 16, give: true })
   assert.deepEqual(parseCompanionOrder('get me food'), { action: 'get', item: 'food', count: 4, give: true })
+  assert.deepEqual(parseCompanionOrder('traeme 2 de madera'), { action: 'get', item: 'log', count: 2, give: true })
+  assert.deepEqual(parseCompanionOrder('dame 10 de piedra'), { action: 'get', item: 'cobblestone', count: 10, give: true })
+  assert.deepEqual(parseCompanionOrder('bring me 2 wood'), { action: 'get', item: 'log', count: 2, give: true })
 })
 
 test('killing', () => {

@@ -148,6 +148,7 @@ export interface IElectronAPI {
     warmSupporters: () => Promise<void>
     onStateChanged: (callback: (state: CompanionEmotionState) => void) => () => void
     onSpeechChanged: (callback: (payload: { text: string; durationMs: number; speakVoice?: boolean; live?: boolean; cameo?: boolean }) => void) => () => void
+    onPortal: (callback: (direction: 'out' | 'in') => void) => () => void
     onLanguageChanged: (callback: (lang: string) => void) => () => void
   }
   agent: {

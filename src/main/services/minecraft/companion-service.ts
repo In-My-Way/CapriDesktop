@@ -138,6 +138,7 @@ export function readCompanionAnswer(raw: string): CompanionReading {
 class CompanionService {
   private speak: (text: string) => void = () => {}
   private prompt: (text: string) => void = () => {}
+  private presence: (inWorld: boolean) => void = () => {}
   private present = false
   private inWorld = false
   private lastEvent = 0
@@ -154,9 +155,10 @@ class CompanionService {
   private chatReplyUntil = 0
 
   /** How she talks (set once by the agent manager): out loud, and a way to hand a chat line to her brain */
-  public setup(speak: (text: string) => void, prompt: (text: string) => void): void {
+  public setup(speak: (text: string) => void, prompt: (text: string) => void, presence?: (inWorld: boolean) => void): void {
     this.speak = speak
     this.prompt = prompt
+    if (presence) this.presence = presence
     if (this.polling) return
     this.polling = setInterval(() => void this.poll(), 1200)
     this.polling.unref?.()
@@ -178,6 +180,13 @@ class CompanionService {
   }
 
   /** A long answer goes as several chat lines, cut between sentences, instead of being chopped */
+  /** She's in the game now, or back (the desktop shows it: she glitches out of it or onto it) */
+  private setPresent(present: boolean): void {
+    if (present === this.present) return
+    this.present = present
+    this.presence(present)
+  }
+
   private async postToChat(text: string): Promise<void> {
     const clean = (text || '').replace(/\[[^\]\n]{1,40}\]/g, '').replace(/\s+/g, ' ').trim()
     for (const line of chatLines(clean)) {
@@ -228,7 +237,7 @@ class CompanionService {
       if (!joinLeave) return { handled: false }
       return { handled: true, reply: this.es ? '[curious] Minecraft está abierto, pero todavía no entraste a un mundo.' : "[curious] Minecraft is open, but you're not in a world yet." }
     }
-    this.present = !!ping.companion
+    this.setPresent(!!ping.companion)
 
     let order: CompanionReading = parseCompanionOrder(text)
     if (!order) {
@@ -315,12 +324,12 @@ class CompanionService {
   private async poll(): Promise<void> {
     const status = await bridge<CompanionStatus>(`/companion/status?since=${this.lastEvent}`, undefined, 1000)
     if (!status) {
-      this.present = false
+      this.setPresent(false)
       this.inWorld = false
       return
     }
     this.inWorld = !!status.server
-    this.present = !!status.present
+    this.setPresent(!!status.present)
     this.status = status
     const events = status.events || []
     // Whatever happened before the app was watching was already said (or never will be)

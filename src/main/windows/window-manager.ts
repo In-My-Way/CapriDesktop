@@ -243,6 +243,44 @@ export class WindowManager {
     return this.isAway()
   }
 
+  private inMinecraft = false
+
+  public isInMinecraft(): boolean {
+    return this.inMinecraft
+  }
+
+  /** While she's in Minecraft, whatever shows her window (a finished task, the Deck closing) puts it back */
+  private keepHiddenInGame = (): void => {
+    if (this.inMinecraft) this.companionWin?.hide()
+  }
+
+  /**
+   * She went into the player's Minecraft world, or came back: she glitches out of the desktop (the window
+   * hides once the effect is over, she still talks) or glitches back onto it
+   */
+  public setInMinecraft(on: boolean): void {
+    if (on === this.inMinecraft) return
+    this.inMinecraft = on
+    const win = this.companionWin
+    if (!win || win.isDestroyed()) return
+    this.broadcast(IPC_CHANNELS.COMPANION_PORTAL, on ? 'out' : 'in')
+    if (on) {
+      roamingManager.pause()
+      setTimeout(() => {
+        if (!this.inMinecraft || win.isDestroyed()) return
+        win.hide()
+        win.on('show', this.keepHiddenInGame)
+      }, 1100)
+      return
+    }
+    win.removeListener('show', this.keepHiddenInGame)
+    if (this.isAway() || this.isDeckVisible()) return
+    win.showInactive()
+    win.setAlwaysOnTop(true, 'screen-saver', 1)
+    win.moveTop()
+    roamingManager.resume()
+  }
+
   /** Started while away: the first time something shows her window it goes back to hidden */
   private keepHiddenAtStart = (): void => {
     if (this.isAway()) this.companionWin?.hide()
