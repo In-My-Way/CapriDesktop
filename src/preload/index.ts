@@ -10,6 +10,8 @@ import type { AiAppInfo } from '../main/services/ai-apps'
 import type { CyberpunkFolderInfo, CyberpunkFoldersState } from '../main/services/game/adapters/cyberpunk/cyberpunk-folders'
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
 import type { HotkeyAction, HotkeyProblem, Hotkeys } from '../shared/hotkeys'
+import type { BenchmarkRequest, BenchmarkResult } from '../shared/benchmark'
+import type { BugReportResult, LogLine } from '../shared/logs'
 import {
   IPC_CHANNELS,
   CompanionEmotionState,
@@ -490,6 +492,26 @@ const api = {
       const sub = (): void => callback()
       ipcRenderer.on(IPC_CHANNELS.VOICE_CANCEL_RECORDING, sub)
       return () => ipcRenderer.removeListener(IPC_CHANNELS.VOICE_CANCEL_RECORDING, sub)
+    }
+  },
+
+  benchmark: {
+    run: (req: BenchmarkRequest): Promise<BenchmarkResult> => ipcRenderer.invoke(IPC_CHANNELS.BENCHMARK_RUN, req)
+  },
+
+  // Her logs: the bug report and the live view in Settings
+  logs: {
+    get: (): Promise<LogLine[]> => ipcRenderer.invoke(IPC_CHANNELS.LOGS_GET),
+    copyBugReport: (): Promise<BugReportResult> => ipcRenderer.invoke(IPC_CHANNELS.BUG_REPORT_COPY),
+    /** New lines while the panel is open; returns the function that stops them */
+    watch: (callback: (lines: LogLine[]) => void): (() => void) => {
+      const handler = (_event: IpcRendererEvent, lines: LogLine[]): void => callback(lines)
+      ipcRenderer.on(IPC_CHANNELS.LOGS_LINES, handler)
+      void ipcRenderer.invoke(IPC_CHANNELS.LOGS_SUBSCRIBE)
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.LOGS_LINES, handler)
+        void ipcRenderer.invoke(IPC_CHANNELS.LOGS_UNSUBSCRIBE)
+      }
     }
   },
 

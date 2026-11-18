@@ -55,6 +55,7 @@ import { parseValorantCommand } from '../services/valorant/command-parser'
 import { valorantAgentSelect, valorantPickMessage } from '../services/valorant/agent-select-service'
 import { leaveValorantQueue, startValorantQueue, valorantIsTheOpenGame, valorantQueueMessage } from '../services/valorant/matchmaking-service'
 import { originalWords, parseMemoryCommand, type MemoryCommand } from './memory-commands'
+import { capabilityManual, helpAnswer, parseHelpRequest } from './help-requests'
 import { memoryService } from '../services/memory-service'
 import { listKnownApps } from '../services/known-apps'
 import { appRequestInEnglish, fixedCommandLanguage, isHoldStillRequest, isKnownAppsRequest, isMoveAgainRequest, isStopWatchScreenRequest, isUpdateInOtherLanguage, isVersionRequest, isWatchScreenRequest, isWhatsNewInOtherLanguage } from './spoken-commands'
@@ -220,6 +221,9 @@ class ReplyTimeoutError extends Error {
 }
 const CLOUD_REPLY_TIMEOUT_MS = 2 * 60_000
 
+/** Why no local model answered: Ollama unreachable, nothing installed, or the model call failed */
+type BrainProblem = { kind: 'unreachable' | 'no-models' | 'failed'; model: string; detail?: string }
+
 /** Lists, explanations and stories need room, in any language */
 function wantsLongAnswer(text: string): boolean {
   if (text.length > 140) return true
@@ -363,6 +367,10 @@ export class CapriLocalAgent extends EventEmitter {
     const fixedCommand = commandInEnglish(prompt)
     // Her own short commands in any language ("quedate quieta") say which language they are in
     const spokenCommandLang = fixedCommandLanguage(prompt)
+    // What the model would get, kept for a request the command shortcuts took and couldn't do
+    this.turn = { spokenPrompt, endpoint: config.endpoint || 'http://localhost:11434/v1', config, handedToModel: false }
+    // "How do I make you stay still?", "what can you do?": answered from her catalog, in any language
+    const helpRequest = fixedCommand ? null : parseHelpRequest(prompt)
     const detectedLang = heardLang || fixedCommand?.lang || spokenCommandLang || CapriLocalAgent.detectLanguage(prompt.trim())
     if (detectedLang !== 'unknown') consciousnessService.setSpokenLanguage(detectedLang)
     const conversationLang = consciousnessService.getSpokenLanguage()
@@ -372,7 +380,7 @@ export class CapriLocalAgent extends EventEmitter {
     if (fixedCommand) {
       console.log(`[Capri Agent] Command in ${fixedCommand.lang}, read as: "${fixedCommand.text}"`)
       prompt = fixedCommand.text
-    } else if (!spokenCommandLang && conversationLang && !['en', 'es'].includes(conversationLang) && prompt.length < 300) {
+    } else if (!helpRequest && !spokenCommandLang && conversationLang && !['en', 'es'].includes(conversationLang) && prompt.length < 300) {
       const english = await voiceService.translateCommand(prompt.trim())
       // Sometimes the model answers instead of translating: an answer is not the command
       if (english && !/[\r\n]/.test(english) && english.length <= prompt.length * 2 + 20) {
@@ -391,6 +399,14 @@ export class CapriLocalAgent extends EventEmitter {
 
     this.replyLang = activeLang
     const isSpanish = activeLang === 'es'
+
+    // Before any command runs: "how do I turn on gaming mode?" must explain it, not turn it on
+    if (helpRequest) {
+      console.log(`[Capri Agent] Help question: ${helpRequest.kind === 'how' ? helpRequest.capability.id : 'what can you do'}`)
+      this.emitAssistant(helpAnswer(helpRequest, activeLang, process.platform, consciousnessService.getHotkeys()))
+      this.finishSession()
+      return
+    }
 
     const desktopCommand = isMac ? parseDesktopCommand(trimmed) : null
     if (desktopCommand) {
@@ -1637,8 +1653,8 @@ export class CapriLocalAgent extends EventEmitter {
       return
     }
 
-    // No local model reachable: smart offline tool executor
-    await this.runSmartAutonomous(prompt, projectPath)
+    // No local model reachable: smart offline tool executor, which says why if it can't do the request
+    await this.runSmartAutonomous(prompt, projectPath, this.lastModelProblem ?? { kind: 'unreachable', model: requestedModel })
   }
 
   // --- LLM Powered Autonomous Loop (Ollama / LocalAI / OpenRouter) ---
@@ -1817,6 +1833,9 @@ LANGUAGE RULE: ${langDirective}`
 
     const ownLines = this.takeOwnLinesNote()
     if (ownLines) this.conversationHistory.push({ role: 'system', content: ownLines })
+    // A question about her own features she didn't answer from the catalog: the matching entries go along
+    const manual = capabilityManual(spokenText, process.platform, consciousnessService.getHotkeys())
+    if (manual) this.conversationHistory.push({ role: 'system', content: manual })
 
     this.conversationHistory.push({
       role: 'user',
@@ -2220,7 +2239,10 @@ LANGUAGE RULE: ${langDirective}`
           this.finishSession()
           return
         }
-        await this.runSmartAutonomous(prompt, projectPath)
+        // A local model that fails says why instead of the offline small talk (issue #37)
+        const detail = String((err as Error)?.message || err).replace(/\s+/g, ' ').slice(0, 160)
+        console.warn(`[Capri Agent] Local model ${model} failed:`, err)
+        await this.runSmartAutonomous(prompt, projectPath, { kind: 'failed', model, detail })
         return
       }
     }
@@ -2232,7 +2254,7 @@ LANGUAGE RULE: ${langDirective}`
     } as AgentEventPayload)
   }
 
-  private async runSmartAutonomous(prompt: string, projectPath: string): Promise<void> {
+  private async runSmartAutonomous(prompt: string, projectPath: string, brainProblem?: BrainProblem): Promise<void> {
     const p = prompt.trim()
     const lower = p.toLowerCase()
     const isSpanish = CapriLocalAgent.detectLanguage(p) === 'es'
@@ -2740,6 +2762,27 @@ LANGUAGE RULE: ${langDirective}`
     const fastLore = this.resolveFastLoreResponse(p, isSpanish)
     if (fastLore) {
       this.emitAssistant(fastLore)
+      this.finishSession()
+      return
+    }
+
+    // A shortcut took it ("play", "open" and "pon" are in plenty of ordinary sentences) and no command
+    // matched: the model answers it, instead of the same small talk every time
+    const turn = this.turn
+    if (!brainProblem && turn && !turn.handedToModel && !this.isCancelled) {
+      turn.handedToModel = true
+      const model = await this.resolveAvailableModel(turn.endpoint, turn.config.model || 'capri')
+      if (model) {
+        console.log('[Capri Agent] No command matched, the model answers instead')
+        await this.runWithLlm(turn.spokenPrompt, projectPath, turn.endpoint, { ...turn.config, model })
+        return
+      }
+      brainProblem = this.lastModelProblem ?? { kind: 'unreachable', model: turn.config.model || 'capri' }
+    }
+
+    // Her brain didn't load: she says what went wrong, so it doesn't look like she's answering (issue #37)
+    if (brainProblem) {
+      this.emitAssistant(this.brainProblemLine(brainProblem, isSpanish))
       this.finishSession()
       return
     }
@@ -4852,18 +4895,29 @@ DIRECTIVES FOR FORMATTING AND REASONING:
   }
 
   private async resolveAvailableModel(endpoint: string, requestedModel: string): Promise<string | null> {
+    this.lastModelProblem = null
+    const url = `${endpoint.replace(/\/+$/, '')}/models`
     try {
+      // A cold Ollama can take a few seconds to list its models; a stopped one refuses at once
       const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 1500)
-      const res = await llmFetch(`${endpoint.replace(/\/+$/, '')}/models`, {
+      const timeout = setTimeout(() => controller.abort(), 5000)
+      const res = await llmFetch(url, {
         signal: controller.signal
       })
       clearTimeout(timeout)
-      if (!res.ok) return null
+      if (!res.ok) {
+        console.warn(`[Capri Agent] ${url} answered HTTP ${res.status}, so no model can answer`)
+        this.lastModelProblem = { kind: 'failed', model: requestedModel, detail: `HTTP ${res.status}` }
+        return null
+      }
 
       const data = (await res.json()) as { data?: { id: string }[] }
       const models = (data.data || []).map((m) => m.id)
-      if (models.length === 0) return null
+      if (models.length === 0) {
+        console.warn(`[Capri Agent] ${url} lists no models`)
+        this.lastModelProblem = { kind: 'no-models', model: requestedModel }
+        return null
+      }
 
       // Exact match: always honor the model the user selected in settings
       if (requestedModel && models.includes(requestedModel)) return requestedModel
@@ -4889,9 +4943,35 @@ DIRECTIVES FOR FORMATTING AND REASONING:
       if (isMac && models.includes('qwen3:1.7b')) return this.reportModelFallback(requestedModel, 'qwen3:1.7b')
       // Fallback to first available model in Ollama
       return this.reportModelFallback(requestedModel, models[0])
-    } catch {
+    } catch (err) {
+      console.warn(`[Capri Agent] Could not reach ${url}:`, (err as Error)?.message || err)
+      this.lastModelProblem = { kind: 'unreachable', model: requestedModel }
       return null
     }
+  }
+
+  /** Why the last model lookup found nothing to answer with */
+  private lastModelProblem: BrainProblem | null = null
+
+  /** The request being answered, as the model would get it */
+  private turn: { spokenPrompt: string; endpoint: string; config: AgentConfig; handedToModel: boolean } | null = null
+
+  /** What she says when her brain didn't load, instead of small talk that looks like an answer */
+  private brainProblemLine(problem: BrainProblem, isSpanish: boolean): string {
+    const model = problem.model || 'capri'
+    if (problem.kind === 'unreachable') {
+      return isSpanish
+        ? `[worried] No llego a Ollama, choomba, así que mi cerebro (${model}) no está cargado. Abrí Ollama o elegí otro cerebro en IA y modelos.`
+        : `[worried] I can't reach Ollama, choomba, so my brain (${model}) isn't loaded. Open Ollama, or pick another brain in AI & models.`
+    }
+    if (problem.kind === 'no-models') {
+      return isSpanish
+        ? `[worried] Ollama no tiene ningún modelo instalado, choomba, así que no tengo cerebro. Descargá uno en IA y modelos.`
+        : `[worried] Ollama has no models installed, choomba, so I have no brain to think with. Download one in AI & models.`
+    }
+    return isSpanish
+      ? `[worried] Mi cerebro no cargó bien, choomba: ${model} falló (${problem.detail || 'sin detalle'}). Probá otro modelo en IA y modelos; en Configuración > Logs está el detalle.`
+      : `[worried] My brain didn't load right, choomba: ${model} failed (${problem.detail || 'no details'}). Try another model in AI & models; Settings > Logs has the details.`
   }
 
   private warnedFallback = ''

@@ -1,15 +1,20 @@
 import React, { useEffect } from 'react'
-import { AppWindow, Apple, Cpu, Heart, Languages, Sliders, Sparkles, X } from 'lucide-react'
+import { AppWindow, Apple, CircleHelp, Cpu, Gauge, HandHeart, Heart, Languages, ScrollText, Sliders, Sparkles, Users, X } from 'lucide-react'
 import { AgentSettingsModal } from './AgentSettingsModal'
 import { VoiceSettingsModal } from '../companion/VoiceSettingsModal'
 import { LanguageSettingsModal } from './LanguageSettingsModal'
 import { AppsModal } from './AppsModal'
 import { SupportersPanel } from './SupportersPanel'
+import { BenchmarkSettings } from './BenchmarkSettings'
+import { BugReportButton, LogsPanel } from './LogsPanel'
+import { CollaboratorsPanel } from './CollaboratorsPanel'
+import { SupportPanel } from './SupportPanel'
+import { HelpPanel } from './HelpPanel'
 import { MacSettings } from '../components/MacSettings'
 import { BehaviorSettings } from '../companion/BehaviorSettings'
 import { useT, useUiLang } from '../utils/useUiLang'
 
-export type SettingsTab = 'ai' | 'capri' | 'voice' | 'language' | 'apps' | 'supporters' | 'mac'
+export type SettingsTab = 'ai' | 'capri' | 'voice' | 'language' | 'apps' | 'benchmark' | 'logs' | 'help' | 'support' | 'supporters' | 'collaborators' | 'mac'
 
 interface SettingsHubProps {
   isOpen: boolean
@@ -40,8 +45,13 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({ isOpen, tab, onTabChan
     { id: 'voice', label: t('deck_voiceConfig'), icon: <Sliders size={14} /> },
     { id: 'language', label: t('deck_language'), icon: <Languages size={14} /> },
     { id: 'apps', label: t('deck_apps'), icon: <AppWindow size={14} /> },
+    { id: 'benchmark', label: t('bm_tab'), icon: <Gauge size={14} /> },
+    { id: 'logs', label: t('logs_tab'), icon: <ScrollText size={14} /> },
     ...(isMac ? [{ id: 'mac' as const, label: 'Mac & Spotify', icon: <Apple size={14} /> }] : []),
-    { id: 'supporters', label: 'Supporters', icon: <Heart size={14} /> }
+    { id: 'help', label: t('help_tab'), icon: <CircleHelp size={14} /> },
+    { id: 'support', label: t('support_tab'), icon: <HandHeart size={14} /> },
+    { id: 'supporters', label: 'Supporters', icon: <Heart size={14} /> },
+    { id: 'collaborators', label: t('collab_tab'), icon: <Users size={14} /> }
   ]
 
   return (
@@ -62,7 +72,7 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({ isOpen, tab, onTabChan
 
         <div className="flex flex-1 min-h-0">
           {/* The sections, one under the other */}
-          <nav className="w-48 shrink-0 border-r border-[var(--cp-red-line)] bg-[#170a0b] p-2 space-y-1 overflow-y-auto" aria-label={isEs ? 'Secciones' : 'Sections'}>
+          <nav className="w-48 shrink-0 border-r border-[var(--cp-red-line)] bg-[#170a0b] p-2 flex flex-col gap-1 overflow-y-auto" aria-label={isEs ? 'Secciones' : 'Sections'}>
             {tabs.map((item) => (
               <button
                 key={item.id}
@@ -79,6 +89,10 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({ isOpen, tab, onTabChan
                 <span className="truncate">{item.label}</span>
               </button>
             ))}
+            {/* Always at hand: copies what's needed to report a problem */}
+            <div className="mt-auto pt-3">
+              <BugReportButton compact />
+            </div>
           </nav>
 
           {/* The chosen section */}
@@ -104,12 +118,17 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({ isOpen, tab, onTabChan
             {tab === 'voice' && <VoiceSettingsModal isOpen embedded onClose={onClose} />}
             {tab === 'language' && <LanguageSettingsModal isOpen embedded onClose={onClose} />}
             {tab === 'apps' && <AppsModal isOpen embedded onClose={onClose} />}
+            {tab === 'benchmark' && <BenchmarkSettings />}
             {tab === 'mac' && isMac && (
               <div className="cp-scroll flex-1 min-h-0 overflow-y-auto p-5">
                 <MacSettings />
               </div>
             )}
+            {tab === 'logs' && <LogsPanel />}
+            {tab === 'help' && <HelpPanel isMac={isMac} />}
+            {tab === 'support' && <SupportPanel />}
             {tab === 'supporters' && <SupportersPanel />}
+            {tab === 'collaborators' && <CollaboratorsPanel />}
           </div>
         </div>
       </div>

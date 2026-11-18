@@ -1,6 +1,6 @@
 {
   "name": "capridesktop",
-  "version": "1.0.4",
+  "version": "1.0.6",
   "type": "module",
   "description": "Capri, a cyberpunk desktop companion that lives on your screen: voice chat with a local LLM, game commentary (League of Legends, Cyberpunk 2077), voice macros and a coding agent.",
   "main": "./out/main/index.js",
@@ -17,6 +17,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test:game-reactions": "node --test scripts/test-game-reactions.mjs scripts/test-game-capture.mjs scripts/test-valorant-integration.mjs",
+    "test:capabilities": "node --test scripts/test-capabilities.mjs",
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "electron-vite build",

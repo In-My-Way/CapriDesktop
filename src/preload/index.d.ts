@@ -8,6 +8,8 @@ import type { ModelPullProgress } from '../main/services/ollama-service'
 import type { InstalledPart, LocalModelInfo } from '../main/services/installed-parts'
 import type { AiAppInfo } from '../main/services/ai-apps'
 import type { CyberpunkFolderInfo, CyberpunkFoldersState } from '../main/services/game/adapters/cyberpunk/cyberpunk-folders'
+import type { BenchmarkRequest, BenchmarkResult } from '../shared/benchmark'
+import type { BugReportResult, LogLine } from '../shared/logs'
 import type { HotkeyAction, HotkeyProblem, Hotkeys } from '../shared/hotkeys'
 import {
   CompanionEmotionState,
@@ -252,6 +254,14 @@ export interface IElectronAPI {
     onCancelRecording: (callback: () => void) => () => void
     onToggleAlwaysListening: (callback: () => void) => () => void
     wakeCheck: (text: string) => Promise<{ addressed: boolean; text: string; reason: 'wake_word' | 'macro' | 'none' }>
+  }
+  benchmark: {
+    run: (req: BenchmarkRequest) => Promise<BenchmarkResult>
+  }
+  logs: {
+    get: () => Promise<LogLine[]>
+    copyBugReport: () => Promise<BugReportResult>
+    watch: (callback: (lines: LogLine[]) => void) => () => void
   }
   media: {
     control: (action: 'play' | 'pause' | 'play_pause' | 'next' | 'prev') => Promise<{ success: boolean; output: string }>
