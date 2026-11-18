@@ -102,7 +102,9 @@ public final class TaskRunner {
 	}
 
 	public String pingJson() {
-		return "{\"ok\":true,\"version\":\"" + CapriCraftClient.VERSION + "\",\"inWorld\":" + inWorld + "}";
+		return "{\"ok\":true,\"version\":\"" + CapriCraftClient.VERSION + "\",\"inWorld\":" + inWorld
+			+ ",\"companion\":" + com.nunezvalen.capricraft.companion.Companion.present()
+			+ ",\"server\":" + com.nunezvalen.capricraft.companion.Companion.serverRunning() + "}";
 	}
 
 	public synchronized String statusJson(long since) {

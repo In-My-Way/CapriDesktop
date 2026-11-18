@@ -56,3 +56,12 @@ await build({
   }}]
 })
 execFileSync(process.execPath,['--test','work/capri-craft-tests.cjs'],{stdio:'inherit'})
+
+await build({
+  entryPoints:['tests/companion.test.ts'],outfile:'work/companion-tests.cjs',bundle:true,platform:'node',format:'cjs',
+  plugins:[{name:'companion-mocks',setup(b){
+    b.onResolve({filter:/consciousness-service$/},()=>({path:mock('agent-lifecycle-mocks.ts')}))
+    b.onResolve({filter:/llm-gateway$/},()=>({path:mock('llm-gateway-mock.ts')}))
+  }}]
+})
+execFileSync(process.execPath,['--test','work/companion-tests.cjs'],{stdio:'inherit'})

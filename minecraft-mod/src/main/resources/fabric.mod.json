@@ -3,7 +3,7 @@
 	"id": "capricraft",
 	"version": "${version}",
 	"name": "Capri Craft",
-	"description": "Lets Capri (CapriDesktop) take over your player when you ask her: go get diamonds, and she makes the pickaxe she needs on the way.",
+	"description": "Capri (CapriDesktop) in your world: she joins as a companion with her own skin who follows you, fights, gathers, crafts and builds when you ask by voice or chat, and keeps her things when she dies. She can also take over your player to get diamonds.",
 	"authors": ["nunezValen"],
 	"contact": {
 		"sources": "https://github.com/nunezValen/CapriDesktop"
@@ -11,6 +11,7 @@
 	"license": "MIT",
 	"environment": "client",
 	"entrypoints": {
+		"main": ["com.nunezvalen.capricraft.CapriCraftMod"],
 		"client": ["com.nunezvalen.capricraft.CapriCraftClient"]
 	},
 	"depends": {

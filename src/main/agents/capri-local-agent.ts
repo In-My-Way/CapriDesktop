@@ -39,6 +39,7 @@ import { getSystemPromptPersona, personaIntro } from '../services/system-prompt-
 import { scannerService } from '../services/scanner-service'
 import { watchPartyService } from '../services/watch-party-service'
 import { capriCraftService } from '../services/minecraft/capri-craft-service'
+import { companionService } from '../services/minecraft/companion-service'
 import { boredomService } from '../services/boredom-service'
 import { proactiveDialogueService } from '../services/proactive-dialogue-service'
 import { paintDrawerService } from '../services/paint-drawer-service'
@@ -558,6 +559,15 @@ export class CapriLocalAgent extends EventEmitter {
           ? '[curious] Todavía no conozco ninguna app por nombre. Agregalas en el Dev Deck, en Apps, o pedime que abra una y mostrame dónde está.'
           : "[curious] I don't know any apps by name yet. Add them in the Dev Deck under Apps, or ask me to open one and show me where it is."
       )
+      this.finishSession()
+      return
+    }
+
+    // Capri in your Minecraft world with her own body: "unite a mi mundo", "seguime", "construime una casa".
+    // Before "quedate quieta": while she's in the game, "quedate acá" is for her body there
+    const companionResult = await companionService.handleCommand(trimmed)
+    if (companionResult.handled) {
+      if (companionResult.reply) this.emitAssistant(companionResult.reply)
       this.finishSession()
       return
     }

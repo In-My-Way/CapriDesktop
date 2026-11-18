@@ -20,6 +20,12 @@ import java.nio.charset.StandardCharsets;
  *   GET  /status?since=N the current task, its step and the events after N
  *   POST /task           {"action":"get","item":"diamond","count":3} | {"action":"mine","block":"oak_log","count":10}
  *                        | {"action":"goto","x":0,"y":64,"z":0} | {"action":"stop"}
+ *   GET  /companion/status?since=N  Capri's body in the world: where she is, what she carries, what
+ *                        she's doing, and events (including what the player typed in the chat)
+ *   POST /companion      {"action":"join"|"leave"|"follow"|"stay"|"come"|"stop"} | {"action":"get","item":"diamond","count":3,"give":true}
+ *                        | {"action":"mine","block":"sand","count":20} | {"action":"kill","mob":"zombie","count":3}
+ *                        | {"action":"build","what":"house","material":"stone"} | {"action":"give","item":"all"}
+ *                        | {"action":"say","text":"..."} (in the game's chat)
  */
 public final class BridgeServer implements Runnable {
 	public static final int PORT = 25599;
@@ -100,6 +106,28 @@ public final class BridgeServer implements Runnable {
 					}
 				}
 				respond(socket, 200, runner.statusJson(since));
+			} else if (method.equals("GET") && path.equals("/companion/status")) {
+				long since = 0;
+				for (String pair : query.split("&")) {
+					if (pair.startsWith("since=")) {
+						try { since = Long.parseLong(pair.substring(6)); } catch (NumberFormatException ignored) {}
+					}
+				}
+				respond(socket, 200, com.nunezvalen.capricraft.companion.Companion.statusJson(since));
+			} else if (method.equals("POST") && path.equals("/companion")) {
+				JsonObject order;
+				try {
+					order = JsonParser.parseString(bodyText).getAsJsonObject();
+				} catch (RuntimeException e) {
+					respond(socket, 400, "{\"ok\":false,\"error\":\"bad_json\"}");
+					return;
+				}
+				if (!com.nunezvalen.capricraft.companion.Companion.serverRunning()) {
+					respond(socket, 409, "{\"ok\":false,\"error\":\"not_in_world\"}");
+					return;
+				}
+				com.nunezvalen.capricraft.companion.Companion.submit(order);
+				respond(socket, 202, "{\"ok\":true}");
 			} else if (method.equals("POST") && path.equals("/task")) {
 				JsonObject task;
 				try {
@@ -117,6 +145,19 @@ public final class BridgeServer implements Runnable {
 				mc.execute(() -> {
 					if (mc.player != null) mc.player.connection.sendCommand(command.startsWith("/") ? command.substring(1) : command);
 				});
+				respond(socket, 202, "{\"ok\":true}");
+			} else if (method.equals("POST") && path.equals("/dev/chat") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
+				// Only in the development client: the player types this in the chat
+				String text = bodyText.trim();
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				mc.execute(() -> {
+					if (mc.player != null) mc.player.connection.sendChat(text);
+				});
+				respond(socket, 202, "{\"ok\":true}");
+			} else if (method.equals("POST") && path.equals("/dev/screenshot") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
+				// Only in the development client: the game window as a PNG in run/screenshots (to check how she looks)
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				mc.execute(() -> net.minecraft.client.Screenshot.grab(mc, false));
 				respond(socket, 202, "{\"ok\":true}");
 			} else if (method.equals("POST") && path.equals("/dev/respawn") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
 				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
@@ -142,6 +183,7 @@ public final class BridgeServer implements Runnable {
 			case 202 -> "Accepted";
 			case 400 -> "Bad Request";
 			case 403 -> "Forbidden";
+			case 409 -> "Conflict";
 			default -> "Not Found";
 		};
 		String head = "HTTP/1.1 " + status + " " + reason + "\r\n"

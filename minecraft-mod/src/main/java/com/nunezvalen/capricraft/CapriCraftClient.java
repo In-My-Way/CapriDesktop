@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 public final class CapriCraftClient implements ClientModInitializer {
 	public static final Logger LOG = LoggerFactory.getLogger("capricraft");
 	public static String VERSION = "0.0.0";
+	private static Boolean pauseBefore = null;
 
 	@Override
 	public void onInitializeClient() {
@@ -26,6 +27,20 @@ public final class CapriCraftClient implements ClientModInitializer {
 		// Her cursor is drawn over every menu she might work in
 		ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
 			if (screen instanceof AbstractContainerScreen<?>) ScreenEvents.afterExtract(screen).register(runner.hand::render);
+		});
+		// Capri's own body in your world: her skin, and who she belongs to
+		net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(CapriCraftMod.CAPRI, com.nunezvalen.capricraft.client.CapriRenderer::new);
+		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
+			if (mc.player != null) com.nunezvalen.capricraft.companion.Companion.localPlayer = mc.player.getUUID();
+			// While she's in your world the game doesn't pause when you look at another window (to talk to her, say)
+			boolean present = com.nunezvalen.capricraft.companion.Companion.present();
+			if (present && pauseBefore == null) {
+				pauseBefore = mc.options.pauseOnLostFocus;
+				mc.options.pauseOnLostFocus = false;
+			} else if (!present && pauseBefore != null) {
+				mc.options.pauseOnLostFocus = pauseBefore;
+				pauseBefore = null;
+			}
 		});
 		new BridgeServer(runner).start();
 	}
