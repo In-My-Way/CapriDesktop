@@ -10,6 +10,12 @@ test('joining and leaving the world', () => {
   assert.deepEqual(parseJoinLeave('salí del mundo'), { action: 'leave' })
   assert.deepEqual(parseJoinLeave('leave the game'), { action: 'leave' })
   assert.equal(parseJoinLeave('vení acá'), null)
+  for (const t of ['log off', 'log out', 'Log off.', 'logout', 'desloguéate', 'volvé al escritorio', 'go back to the desktop', 'andate', 'leave', 'bye capri']) {
+    assert.deepEqual(parseCompanionOrder(t), { action: 'leave' }, t)
+  }
+  assert.notDeepEqual(parseCompanionOrder('leave me the sword'), { action: 'leave' })
+  assert.equal(parseCompanionOrder('chau'), null)
+  assert.deepEqual(parseCompanionOrder('volvé'), { action: 'come' })
   assert.equal(parseJoinLeave('qué lindo día'), null)
 })
 

@@ -30,6 +30,12 @@ const JOIN = W(
   'un[ií]te|unite|sum[aá]te|j[uú]ntate|entr[aá]|ven[ií]|veni|aparec[eé]|conect[aá]te|join|come|hop on|get in'
 )
 const LEAVE = W('sal[ií]|salite|and[aá]te|andate|ir?te|desconect[aá]te|leave|quit|log off|disconnect')
+// Said to her while she's in the world, no "world" needed: "log off", "volvé al escritorio"
+const LEAVE_BARE = W(
+  'log ?off|log ?out|desloguea?te|deslogu[eé]ate|desconect[aá]te|disconnect|volv[eé] (?:al escritorio|a la (?:pc|compu|computadora))|vuelve al escritorio|' +
+    'go back to (?:the |my )?(?:desktop|computer|pc)|back to (?:the |my )?desktop|come back to (?:the |my )?(?:desktop|computer|pc)'
+)
+const LEAVE_ALONE = /^(?:capri[\s,]*)?(?:leave|and[aá]te|vete|(?:chau|bye|goodbye)\s+capri)[\s.!]*$/iu
 const FOLLOW = W('segu[ií]me|seguime|sigueme|s[ií]gueme|ven[ií] conmigo|veni conmigo|vamos juntos|follow me|come with me')
 const STAY = W(
   'qued[aá]te(?: ac[aá]| ah[ií]| quieta)?|quedate|esper[aá](?:me)? (?:ac[aá]|ah[ií])|no te muevas|stay(?: here)?|wait (?:here|there)|hold on here'
@@ -86,6 +92,7 @@ export function parseCompanionOrder(text: string): CompanionOrder | null {
   const t = text.trim()
   const joinLeave = parseJoinLeave(t)
   if (joinLeave) return joinLeave
+  if ((LEAVE_BARE.test(t) || LEAVE_ALONE.test(t)) && !/no te vayas|don'?t leave/i.test(t)) return { action: 'leave' }
   if (STOP.test(t)) return { action: 'stop' }
   if (INVENTORY.test(t)) return { action: 'inventory' }
   if (DROP.test(t)) return { action: 'drop' }
