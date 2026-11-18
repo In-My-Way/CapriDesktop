@@ -159,6 +159,34 @@ public final class BridgeServer implements Runnable {
 				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 				mc.execute(() -> net.minecraft.client.Screenshot.grab(mc, false));
 				respond(socket, 202, "{\"ok\":true}");
+			} else if (method.equals("POST") && path.equals("/dev/newworld") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
+				// Only in the development client, from the title screen: a brand-new survival world (cheats on) named by the body
+				String name = bodyText.trim().isEmpty() ? "Capri Test" : bodyText.trim();
+				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+				mc.execute(() -> {
+					if (mc.level != null) return;
+					net.minecraft.world.level.LevelSettings settings = new net.minecraft.world.level.LevelSettings(
+						name,
+						net.minecraft.world.level.GameType.SURVIVAL,
+						new net.minecraft.world.level.LevelSettings.DifficultySettings(net.minecraft.world.Difficulty.NORMAL, false, false),
+						true,
+						net.minecraft.world.level.WorldDataConfiguration.DEFAULT
+					);
+					String folder;
+					try {
+						folder = net.minecraft.util.FileUtil.findAvailableName(mc.getLevelSource().getBaseDir(), name, "");
+					} catch (IOException e) {
+						folder = name + " " + System.currentTimeMillis();
+					}
+					mc.createWorldOpenFlows().createFreshLevel(
+						folder,
+						settings,
+						net.minecraft.world.level.levelgen.WorldOptions.defaultWithRandomSeed(),
+						net.minecraft.world.level.levelgen.presets.WorldPresets::createNormalWorldDimensions,
+						new net.minecraft.client.gui.screens.TitleScreen()
+					);
+				});
+				respond(socket, 202, "{\"ok\":true}");
 			} else if (method.equals("POST") && path.equals("/dev/respawn") && net.fabricmc.loader.api.FabricLoader.getInstance().isDevelopmentEnvironment()) {
 				net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 				mc.execute(() -> {
