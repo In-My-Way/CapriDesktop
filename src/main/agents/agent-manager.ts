@@ -74,7 +74,7 @@ export class AgentManager extends EventEmitter {
     if (event.text) event.text = personalize(event.text)
     if (event.error) event.error = personalize(event.error)
     // While she's in your Minecraft world her answers show up in the game's chat too
-    if (event.type === 'assistant.delta' && event.text && companionService.isPresent()) companionService.mirror(event.text)
+    if (event.type === 'assistant.delta' && event.text) companionService.mirror(event.text)
 
     // Broadcast agent event to Dev Deck and Companion
     windowManager.broadcast(IPC_CHANNELS.AGENT_EVENT, event)

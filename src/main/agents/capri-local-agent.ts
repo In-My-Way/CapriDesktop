@@ -1846,6 +1846,9 @@ LANGUAGE RULE: ${langDirective}`
     // A question about her own features she didn't answer from the catalog: the matching entries go along
     const manual = capabilityManual(spokenText, process.platform, consciousnessService.getHotkeys())
     if (manual) this.conversationHistory.push({ role: 'system', content: manual })
+    // She's in the player's Minecraft world: she chats as someone playing with them, and briefly (it goes to the game's chat)
+    const inGame = companionService.contextNote()
+    if (inGame) this.conversationHistory.push({ role: 'system', content: personalize(inGame) })
 
     this.conversationHistory.push({
       role: 'user',

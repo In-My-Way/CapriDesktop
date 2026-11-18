@@ -67,6 +67,22 @@ const MOBS_ES: Record<string, string> = {
 const REQUEST_HINT =
   /(?<!\p{L})(?:and[aá]|ve|vamos|tra[eé]|busc[aá]|hac[eé]|hacete|constru[ií]|mat[aá]|consegu[ií]|junt[aá]|prepar[aá]|equip[aá]te|pon[eé]te|com[eé]|caz[aá]|cav[aá]|pic[aá]|tal[aá]|cort[aá]|dame|necesito|quiero|go|get|make|build|kill|find|bring|craft|collect|hunt|mine|chop|dig|give|need|want)(?!\p{L})/iu
 
+/** Chat-sized pieces (the game shows long lines fine, but a wall of text is hard to read while playing) */
+export function chatLines(text: string, max = 200): string[] {
+  const lines: string[] = []
+  let rest = text.trim()
+  while (rest.length > max) {
+    const window = rest.slice(0, max + 1)
+    let cut = Math.max(window.lastIndexOf('. '), window.lastIndexOf('! '), window.lastIndexOf('? '), window.lastIndexOf('… '))
+    cut = cut > max / 3 ? cut + 1 : window.lastIndexOf(' ')
+    if (cut <= 0) cut = max
+    lines.push(rest.slice(0, cut).trim())
+    rest = rest.slice(cut).trim()
+  }
+  if (rest) lines.push(rest)
+  return lines.slice(0, 6)
+}
+
 export type CompanionReading = CompanionOrder | { action: 'unsupported'; what: string } | null
 
 /** Checks what the model answered: only orders the mod knows get through */
@@ -133,6 +149,9 @@ class CompanionService {
   private lastStep = ''
   private lastStepAt = 0
   private lastFightAt = 0
+  private status: CompanionStatus | null = null
+  // You wrote to her in the game's chat before she joined: her answer goes back there for a while
+  private chatReplyUntil = 0
 
   /** How she talks (set once by the agent manager): out loud, and a way to hand a chat line to her brain */
   public setup(speak: (text: string) => void, prompt: (text: string) => void): void {
@@ -152,12 +171,39 @@ class CompanionService {
     return consciousnessService.getPreferredLanguage() === 'es'
   }
 
-  /** Writes it in the game's chat as her ("<Capri> ...") */
+  /** Writes it in the game's chat as her ("<Capri> ..."), while she's there or answering what you wrote in it */
   public mirror(text: string): void {
-    if (!this.present || !text?.trim()) return
-    const clean = text.replace(/\[[a-z ]+\]/gi, '').replace(/\s+/g, ' ').trim()
-    if (!clean) return
-    void bridge('/companion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: asciiJson({ action: 'say', text: clean.slice(0, 250) }) })
+    if (!this.present && !(this.inWorld && Date.now() < this.chatReplyUntil)) return
+    void this.postToChat(text)
+  }
+
+  /** A long answer goes as several chat lines, cut between sentences, instead of being chopped */
+  private async postToChat(text: string): Promise<void> {
+    const clean = (text || '').replace(/\[[^\]\n]{1,40}\]/g, '').replace(/\s+/g, ' ').trim()
+    for (const line of chatLines(clean)) {
+      await bridge('/companion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: asciiJson({ action: 'say', text: line }) })
+    }
+  }
+
+  /**
+   * What her brain should know while she's in the world: she's playing there with you, what she's
+   * doing, and that her answer also lands in the game's chat
+   */
+  public contextNote(): string | null {
+    if (!this.present) return null
+    const s = this.status
+    const doing = s?.task && s.task !== 'none' ? `busy with "${s.task}"${s.step ? ` (now: ${s.step})` : ''}` : s?.mode === 'stay' ? 'waiting where {name} told you to stay' : 'following {name} around'
+    const carrying = Object.entries(s?.inventory || {})
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([k, v]) => `${v} ${k.replace(/_/g, ' ')}`)
+      .join(', ')
+    return (
+      "Right now you're also inside {name}'s Minecraft world with your own body (the Capri Craft mod), playing with them. " +
+      `You're ${doing}${s?.health !== undefined ? `, with ${Math.ceil(s.health / 2)} of 10 hearts` : ''}${carrying ? `, carrying ${carrying}` : ''}. ` +
+      "What you say is also posted in the game's chat, so keep it short (one or two sentences) and talk like a friend playing alongside them. " +
+      "Game orders (get, mine, kill, build, follow...) are carried out separately: never claim you started doing something in the game unless they asked for it."
+    )
   }
 
   /**
@@ -275,6 +321,7 @@ class CompanionService {
     }
     this.inWorld = !!status.server
     this.present = !!status.present
+    this.status = status
     const events = status.events || []
     // Whatever happened before the app was watching was already said (or never will be)
     if (!this.primed) {
@@ -330,8 +377,7 @@ class CompanionService {
 
   /** Her narration goes to the chat even in the moment she's arriving or leaving */
   private mirrorAlways(text: string): void {
-    const clean = text.replace(/\[[a-z ]+\]/gi, '').replace(/\s+/g, ' ').trim()
-    if (clean && this.inWorld) void bridge('/companion', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: asciiJson({ action: 'say', text: clean.slice(0, 250) }) })
+    if (this.inWorld) void this.postToChat(text)
   }
 
   private pick(options: string[]): string {

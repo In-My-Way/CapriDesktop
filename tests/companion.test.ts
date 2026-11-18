@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { parseCompanionOrder, parseJoinLeave } from '../src/main/services/minecraft/companion-commands'
-import { readCompanionAnswer } from '../src/main/services/minecraft/companion-service'
+import { chatLines, readCompanionAnswer } from '../src/main/services/minecraft/companion-service'
 
 test('joining and leaving the world', () => {
   assert.deepEqual(parseJoinLeave('capri unite a mi mundo'), { action: 'join' })
@@ -62,4 +62,13 @@ test('the model answer is checked', () => {
   assert.deepEqual(readCompanionAnswer('{"action":"follow"}'), { action: 'follow' })
   assert.equal(readCompanionAnswer('{"action":"none"}'), null)
   assert.equal(readCompanionAnswer('not json'), null)
+})
+
+test('long answers go to the game chat as several lines, cut between sentences', () => {
+  assert.deepEqual(chatLines('Hola.'), ['Hola.'])
+  const long = 'Primera frase bastante larga para llenar el renglón del chat. '.repeat(5).trim()
+  const lines = chatLines(long, 130)
+  assert.ok(lines.length > 1)
+  assert.ok(lines.every((l) => l.length <= 130 && l.endsWith('.')))
+  assert.equal(lines.join(' '), long)
 })
