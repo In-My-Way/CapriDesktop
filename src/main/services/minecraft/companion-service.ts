@@ -579,7 +579,7 @@ class CompanionService {
   }
 
   private async inventoryLine(): Promise<string> {
-    const status = await bridge<CompanionStatus>('/companion/status?since=999999999')
+    const status = await bridge<CompanionStatus>('/companion/status?since=9007199254740991')
     const es = this.es
     const entries = Object.entries(status?.inventory || {}).sort((a, b) => b[1] - a[1])
     const { mainhand, ...armor } = status?.equipment || {}

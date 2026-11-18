@@ -6,7 +6,7 @@ export interface WakeCheckResult {
   addressed: boolean
   /** Text with the wake word removed, ready to send as a prompt */
   text: string
-  reason: 'wake_word' | 'macro' | 'none'
+  reason: 'wake_word' | 'macro' | 'game' | 'none'
 }
 
 const WAKE_WORD =

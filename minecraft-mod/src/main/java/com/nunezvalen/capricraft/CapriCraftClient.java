@@ -32,6 +32,13 @@ public final class CapriCraftClient implements ClientModInitializer {
 		net.fabricmc.fabric.api.client.rendering.v1.EntityRendererRegistry.register(CapriCraftMod.CAPRI, com.nunezvalen.capricraft.client.CapriRenderer::new);
 		ClientTickEvents.END_CLIENT_TICK.register(mc -> {
 			if (mc.player != null) com.nunezvalen.capricraft.companion.Companion.localPlayer = mc.player.getUUID();
+			// Baritone reads plain chat as its own commands ("build me a house" → a schematic called "me"):
+			// the chat is for talking to Capri. Its "#" commands still work. Set every tick: its settings file loads late
+			if (mc.player != null) {
+				baritone.api.Settings bs = baritone.api.BaritoneAPI.getSettings();
+				if (bs.chatControl.value) bs.chatControl.value = false;
+				if (bs.chatControlAnyway.value) bs.chatControlAnyway.value = false;
+			}
 			// While she's in your world the game doesn't pause when you look at another window (to talk to her, say)
 			boolean present = com.nunezvalen.capricraft.companion.Companion.present();
 			if (present && pauseBefore == null) {

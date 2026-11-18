@@ -46,7 +46,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public final class Companion {
 	private static final ConcurrentLinkedQueue<JsonObject> inbox = new ConcurrentLinkedQueue<>();
 	private static final Deque<JsonObject> events = new ArrayDeque<>();
-	private static long nextEventId = 1;
+	// Starts at the clock, not 1: after a game restart the app (still waiting for ids above the last it saw) gets the new ones
+	private static long nextEventId = System.currentTimeMillis();
 	private static volatile String snapshot = "{\"present\":false}";
 
 	/** The player she belongs to: whoever is playing on this computer */

@@ -21,6 +21,8 @@ import { voiceService } from '../services/voice-service'
 import { benchmarkService } from '../services/benchmark-service'
 import type { BenchmarkRequest } from '../../shared/benchmark'
 import { checkAddressed } from '../services/wake-word'
+import { companionService } from '../services/minecraft/companion-service'
+import { parseCompanionOrder } from '../services/minecraft/companion-commands'
 import { consciousnessService } from '../services/consciousness-service'
 import { localizeLine } from '../../shared/lines'
 import { ToolExecutor } from '../agents/tools/tool-executor'
@@ -253,7 +255,13 @@ export function registerIpcHandlers(): void {
   )
 
   // Always-listening gate: was this utterance addressed to Capri?
-  ipcMain.handle(IPC_CHANNELS.VOICE_WAKE_CHECK, async (_event, text: string) => checkAddressed(text))
+  ipcMain.handle(IPC_CHANNELS.VOICE_WAKE_CHECK, async (_event, text: string) => {
+    const check = checkAddressed(text)
+    if (check.addressed) return check
+    // She's in the player's Minecraft world: an order for her there ("seguime", "construime una casa") needs no name
+    if (companionService.isPresent() && parseCompanionOrder(text)) return { addressed: true, text: text.trim(), reason: 'game' }
+    return check
+  })
 
   ipcMain.handle(
     IPC_CHANNELS.COMPANION_SET_CLICK_THROUGH,
