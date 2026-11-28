@@ -8,27 +8,46 @@
       "YouTube Music as a music platform",
       "Keeps Capri in the chosen languages",
       "VALORANT live game reactions",
-      "Watch party, AI apps and local vision fixes"
+      "Watch party, AI apps and local vision fixes",
+      "Click-through around her on Windows",
+      "Clear spoken message when a local model fails",
+      "Ignores broken certificate paths for voice",
+      "Scanner capture on PCs with two GPUs",
+      "Commands she only explains no longer run",
+      "Qwen3-TTS review and testing"
     ]
   },
   {
     "login": "3looolyyy",
     "name": "Archo",
-    "work": ["Apple Silicon macOS support"]
+    "work": [
+      "Apple Silicon macOS support",
+      "macOS 1.0.6 validation",
+      "Qwen3-TTS on Apple Silicon"
+    ]
   },
   {
     "login": "In-My-Way",
     "name": "Personified",
-    "work": ["System prompt editor", "Benchmarks"]
+    "work": [
+      "System prompt editor",
+      "Benchmarks",
+      "Local TTS with Qwen3-TTS",
+      "GPU memory budget bar"
+    ]
   },
   {
     "login": "haibanelain",
     "name": "Haibane Lain",
-    "work": ["Ignores N/A window titles on English Windows"]
+    "work": [
+      "Ignores N/A window titles on English Windows"
+    ]
   },
   {
     "login": "MycroftCanner2",
     "name": "Mycroft",
-    "work": ["Grok sign-in and portable build proposal"]
+    "work": [
+      "Grok sign-in and portable build proposal"
+    ]
   }
 ]
