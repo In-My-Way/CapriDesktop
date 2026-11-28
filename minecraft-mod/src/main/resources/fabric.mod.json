@@ -1,0 +1,24 @@
+{
+	"schemaVersion": 1,
+	"id": "capricraft",
+	"version": "${version}",
+	"name": "Capri Craft",
+	"description": "Capri (CapriDesktop) in your world: she joins as a companion with her own skin who follows you, fights, gathers, crafts and builds when you ask by voice or chat, and keeps her things when she dies. She can also take over your player to get diamonds.",
+	"authors": ["nunezValen"],
+	"contact": {
+		"sources": "https://github.com/nunezValen/CapriDesktop"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"main": ["com.nunezvalen.capricraft.CapriCraftMod"],
+		"client": ["com.nunezvalen.capricraft.CapriCraftClient"]
+	},
+	"depends": {
+		"fabricloader": ">=0.20.1",
+		"minecraft": "~26.3",
+		"java": ">=25",
+		"fabric-api": "*",
+		"baritone": "*"
+	}
+}

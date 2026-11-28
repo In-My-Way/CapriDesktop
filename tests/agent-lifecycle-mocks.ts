@@ -18,3 +18,6 @@ export const roamingManager={}
 export const activeWindowService={}
 export const hasPendingResult=()=>false
 export const openPendingResult=()=>{}
+export const getLocalModel=()=>'test-model'
+export const setLocalModel=()=>{}
+export const llmFetch=async()=>new Response('{}',{status:500})

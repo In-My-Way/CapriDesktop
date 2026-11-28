@@ -1,0 +1,36 @@
+plugins {
+	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+}
+
+base {
+	archivesName = 'capricraft'
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Baritone walks and mines for her. Only its API is needed to build: the player installs the
+	// same jar (baritone-api-fabric, the full Baritone) next to this mod; the standalone build hides its API. Put the jar from
+	// https://github.com/cabaletta/baritone/releases/tag/v1.20.0 in libs/
+	compileOnly files("libs/baritone-api-fabric-${project.baritone_version}.jar")
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 25
+	it.options.encoding = 'UTF-8'
+}
+
+java {
+	sourceCompatibility = JavaVersion.VERSION_25
+	targetCompatibility = JavaVersion.VERSION_25
+}

@@ -92,6 +92,23 @@ export const CompanionView: React.FC = () => {
 
   // Track whether Dev Deck is open (Editor Mode vs Pet Mode)
   const [isDeckOpen, setIsDeckOpen] = useState(false)
+  // Going into Minecraft ('out': she glitches away) or coming back from it ('in': she glitches back)
+  const [portal, setPortal] = useState<'out' | 'in' | null>(null)
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const unsub = window.api.companion.onPortal((direction) => {
+      if (timer) clearTimeout(timer)
+      setPortal(direction)
+      playMultiGlitchSound(direction === 'out' ? 6 : 4, direction === 'out' ? 140 : 160)
+      // Gone stays gone (the window hides); back clears once she's fully there
+      if (direction === 'in') timer = setTimeout(() => setPortal(null), 1000)
+    })
+    return () => {
+      if (timer) clearTimeout(timer)
+      unsub()
+    }
+  }, [])
+  const portalClass = portal === 'out' ? ' capri-portal-out' : portal === 'in' ? ' capri-portal-in' : ''
   const isDeckOpenRef = useRef(false)
   useEffect(() => {
     isDeckOpenRef.current = isDeckOpen
@@ -2090,7 +2107,7 @@ export const CompanionView: React.FC = () => {
         onMouseLeave={() => setIsWindowHovered(false)}
         className={`relative w-full h-full flex flex-col items-center justify-start pt-1 select-none overflow-visible font-terminal ${
           isDeckOpen && !isCameo ? 'invisible opacity-0 pointer-events-none' : ''
-        }`}
+        }${portalClass}`}
         style={{
           WebkitAppRegion: 'drag',
           background: 'transparent'
@@ -2232,7 +2249,7 @@ export const CompanionView: React.FC = () => {
       }}
       className={`relative w-full h-full flex flex-col items-center justify-end p-0 select-none overflow-visible font-terminal ${
         isDeckOpen && !isCameo ? 'invisible opacity-0 pointer-events-none' : ''
-      }`}
+      }${portalClass}`}
       style={{
         WebkitAppRegion: 'drag',
         background: 'transparent'

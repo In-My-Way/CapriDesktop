@@ -33,6 +33,8 @@ export const IPC_CHANNELS = {
   COMPANION_REMEMBER_SUPPORTER: 'companion:rememberSupporter',
   COMPANION_WARM_SUPPORTERS: 'companion:warmSupporters',
   COMPANION_SPEECH_CHANGED: 'companion:speechChanged',
+  // She glitches out of the desktop into Minecraft ('out') or back onto it ('in')
+  COMPANION_PORTAL: 'companion:portal',
   COMPANION_SET_TAB_MODE: 'companion:setTabMode',
   COMPANION_SET_EYE_MODE: 'companion:setEyeMode',
   COMPANION_SET_GAMING_MODE: 'companion:setGamingMode',

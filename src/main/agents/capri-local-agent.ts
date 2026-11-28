@@ -38,6 +38,8 @@ import { consciousnessService } from '../services/consciousness-service'
 import { getSystemPromptPersona, personaIntro } from '../services/system-prompt-store'
 import { scannerService } from '../services/scanner-service'
 import { watchPartyService } from '../services/watch-party-service'
+import { capriCraftService } from '../services/minecraft/capri-craft-service'
+import { companionService } from '../services/minecraft/companion-service'
 import { boredomService } from '../services/boredom-service'
 import { proactiveDialogueService } from '../services/proactive-dialogue-service'
 import { paintDrawerService } from '../services/paint-drawer-service'
@@ -561,6 +563,15 @@ export class CapriLocalAgent extends EventEmitter {
       return
     }
 
+    // Capri in your Minecraft world with her own body: "unite a mi mundo", "seguime", "construime una casa".
+    // Before "quedate quieta": while she's in the game, "quedate acá" is for her body there
+    const companionResult = await companionService.handleCommand(trimmed)
+    if (companionResult.handled) {
+      if (companionResult.reply) this.emitAssistant(companionResult.reply)
+      this.finishSession()
+      return
+    }
+
     // "Quedate quieta": she stays where she is until the user moves her
     if (isHoldStillRequest(trimmed)) {
       roamingManager.holdStill()
@@ -576,6 +587,14 @@ export class CapriLocalAgent extends EventEmitter {
     if (isMoveAgainRequest(trimmed)) {
       roamingManager.releaseHold()
       this.emitAssistant(isSpanish ? '[excited] ¡Libre otra vez! Vuelvo a dar vueltas, choomba.' : '[excited] Free again! Back to wandering around, choomba.')
+      this.finishSession()
+      return
+    }
+
+    // Capri Craft: she takes over the player in Minecraft ("andá a buscarme diamantes")
+    const craftResult = await capriCraftService.handleCommand(trimmed)
+    if (craftResult.handled) {
+      if (craftResult.reply) this.emitAssistant(craftResult.reply)
       this.finishSession()
       return
     }
@@ -1827,6 +1846,9 @@ LANGUAGE RULE: ${langDirective}`
     // A question about her own features she didn't answer from the catalog: the matching entries go along
     const manual = capabilityManual(spokenText, process.platform, consciousnessService.getHotkeys())
     if (manual) this.conversationHistory.push({ role: 'system', content: manual })
+    // She's in the player's Minecraft world: she chats as someone playing with them, and briefly (it goes to the game's chat)
+    const inGame = companionService.contextNote()
+    if (inGame) this.conversationHistory.push({ role: 'system', content: personalize(inGame) })
 
     this.conversationHistory.push({
       role: 'user',

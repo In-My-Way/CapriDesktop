@@ -505,3 +505,31 @@ option:checked {
 }
 
 
+
+/* =========================================================================
+   Into Minecraft and back: she tears into glitch slices and collapses like a CRT
+   switching off, then comes back the same way in reverse
+   ========================================================================= */
+@keyframes capri-portal {
+  0% { opacity: 1; transform: none; filter: none; clip-path: inset(0 0 0 0); }
+  8% { transform: translateX(-7px) skewX(9deg); filter: drop-shadow(-5px 0 #ff003c) drop-shadow(5px 0 #00f0ff) hue-rotate(40deg); clip-path: inset(8% 0 52% 0); }
+  16% { transform: translateX(8px); clip-path: inset(48% 0 18% 0); }
+  24% { transform: translateX(-4px) skewX(-11deg); clip-path: inset(0 0 66% 0); }
+  32% { transform: translateX(6px); clip-path: inset(22% 0 40% 0); filter: drop-shadow(-7px 0 #ff003c) drop-shadow(7px 0 #00f0ff) brightness(1.5); }
+  42% { transform: translateX(-9px) skewX(14deg); clip-path: inset(60% 0 8% 0); }
+  52% { transform: translateX(3px); clip-path: inset(0 0 0 0); filter: drop-shadow(-9px 0 #ff003c) drop-shadow(9px 0 #00f0ff) brightness(1.8) saturate(2); }
+  64% { transform: scaleX(1.12) scaleY(0.55); clip-path: inset(36% 0 36% 0); opacity: 0.9; }
+  80% { transform: scaleX(1.5) scaleY(0.04); clip-path: inset(48% 0 48% 0); opacity: 0.75; filter: brightness(3); }
+  100% { transform: scaleX(0) scaleY(0.01); opacity: 0; filter: brightness(4); }
+}
+
+.capri-portal-out {
+  transform-origin: 50% 70%;
+  animation: capri-portal 1s steps(24, end) forwards;
+  pointer-events: none;
+}
+
+.capri-portal-in {
+  transform-origin: 50% 70%;
+  animation: capri-portal 0.9s steps(22, end) reverse both;
+}

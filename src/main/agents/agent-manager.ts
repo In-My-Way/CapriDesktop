@@ -1,3 +1,4 @@
+import os from 'os'
 import { app } from 'electron'
 import { scriptPlayer } from '../services/script/script-player'
 import { getLlmSettings, getLocalModel, isCloudMode, setLocalModel } from '../services/llm-gateway'
@@ -18,6 +19,8 @@ import { ollamaService } from '../services/ollama-service'
 import { roamingManager } from '../roaming/roaming-manager'
 import { activeWindowService } from '../services/active-window-service'
 import { hasPendingResult, openPendingResult } from '../services/pending-result'
+import { capriCraftService } from '../services/minecraft/capri-craft-service'
+import { companionService } from '../services/minecraft/companion-service'
 
 /** Dev Mode tasks shorter than this finish quietly instead of popping Capri up with the wake-up line */
 const DEV_WAKEUP_MIN_MS = 20000
@@ -46,6 +49,14 @@ export class AgentManager extends EventEmitter {
   constructor() {
     super()
     this.setupListeners(this.capriLocal)
+    // What she says about her progress while she plays Minecraft for the player
+    capriCraftService.setSpeaker((text) => this.setCompanionSpeech(text, Math.max(3500, text.length * 70), true))
+    // Her body in your Minecraft world: what she narrates, and what you type in the game's chat goes to her like anything you say
+    companionService.setup(
+      (text) => this.setCompanionSpeech(text, Math.max(3500, text.length * 70), true),
+      (text) => void this.sendPrompt(text, os.homedir(), undefined, 'pet').catch((err) => console.warn('[AgentManager] Minecraft chat prompt failed:', err)),
+      (inWorld) => windowManager.setInMinecraft(inWorld)
+    )
     app.whenReady().then(() => {
       this.config.model = getLocalModel()
     })
@@ -63,6 +74,8 @@ export class AgentManager extends EventEmitter {
     // Fill the {name} placeholder with how the user wants to be called
     if (event.text) event.text = personalize(event.text)
     if (event.error) event.error = personalize(event.error)
+    // While she's in your Minecraft world her answers show up in the game's chat too
+    if (event.type === 'assistant.delta' && event.text) companionService.mirror(event.text)
 
     // Broadcast agent event to Dev Deck and Companion
     windowManager.broadcast(IPC_CHANNELS.AGENT_EVENT, event)
